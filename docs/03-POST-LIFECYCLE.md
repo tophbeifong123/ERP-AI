@@ -1,0 +1,285 @@
+# 03. Post Lifecycle (วงจรชีวิตของโพสต์)
+
+> เอกสารนี้อธิบาย state machine ของ `posts.status` และ transitions ที่อนุญาต
+
+---
+
+## 1. State Diagram
+
+```
+                          ┌──────────┐
+                          │  draft   │ (internal — ใช้เฉพาะ manual create ก่อนส่ง AI)
+                          └────┬─────┘
+                               │ backend enqueue
+                               ▼
+                          ┌────────────┐
+              ┌──────────▶│ generating │◀─────────────┐
+              │           └──────┬─────┘              │
+              │ regenerate*     │ media+caption ok   │
+              │ (no MVP)        │                    │
+              │                 ▼                    │
+              │          ┌────────────────┐          │
+              │  ┌──────▶│pending_approval│◀─────────┘
+              │  │       └─┬──────┬───────┘
+              │  │         │      │ approve
+              │  │         │      ▼
+              │  │         │  ┌──────────┐    ┌────────┐
+              │  │         │  │ approved │───▶│ posted │
+              │  │         │  └────┬─────┘    └────────┘
+              │  │         │       │             ▲
+              │  │         │       │ dispatch    │ success
+              │  │         │       │ (1 min cron)│
+              │  │         │       ▼             │
+              │  │         │   [dispatched]──────┘
+              │  │         │
+              │  │ reject  │ ไม่อนุมัติทันเวลา
+              │  │         │ (1 min cron)
+              │  │         ▼             ▼
+              │  │   ┌──────────┐  ┌─────────┐
+              │  └───│ rejected │  │ expired │
+              │      └──────────┘  └─────────┘
+              │
+              │   ┌──────────┐
+              └──▶│  failed  │ (3 retries exhausted)
+                  └──────────┘
+```
+
+---
+
+## 2. States
+
+| Status | ความหมาย | ใครเป็นคน set |
+|---|---|---|
+| `draft` | internal — ใช้ตอนสร้าง post แต่ยังไม่ enqueue AI | Backend (manual create) |
+| `generating` | AI กำลังสร้าง caption/รูป/คลิป | Backend (หลัง enqueue jobs) |
+| `pending_approval` | รอ user อนุมัติ | Backend (หลัง media+caption callback) |
+| `approved` | user อนุมัติแล้ว รอเวลาโพสต์ | User (POST /posts/{id}/approve) |
+| `posted` | โพสต์ไป Facebook สำเร็จ | Backend (dispatch cron) |
+| `rejected` | user ปฏิเสธ | User (POST /posts/{id}/reject) |
+| `expired` | ไม่อนุมัติทันเวลา | Backend (expire cron) |
+| `failed` | AI job fail 3 ครั้ง / Facebook API fail 3 ครั้ง | Backend (retry exhausted) |
+
+---
+
+## 3. Allowed Transitions
+
+| From | Event | To | ใคร trigger |
+|---|---|---|---|
+| `draft` | enqueue AI jobs | `generating` | Backend (manual create) |
+| `generating` | media + caption สำเร็จ | `pending_approval` | Backend (callback) |
+| `generating` | 1 ในของ AI fail 3 ครั้ง | `failed` | Backend (retry) |
+| `pending_approval` | user approve | `approved` | User |
+| `pending_approval` | user reject | `rejected` | User |
+| `pending_approval` | scheduled_at < now (cron) | `expired` | Backend (expire cron) |
+| `approved` | scheduled_at <= now + dispatch สำเร็จ | `posted` | Backend (dispatch cron) |
+| `approved` | dispatch fail 3 ครั้ง | `failed` | Backend (retry) |
+
+### Transitions ที่ **ไม่อนุญาต**
+
+- ❌ `posted` → อะไรก็ตาม (terminal)
+- ❌ `rejected` → อะไรก็ตาม (terminal ใน MVP — ไม่มี undo)
+- ❌ `expired` → อะไรก็ตาม (terminal)
+- ❌ `failed` → อะไรก็ตาม (terminal — user ต้องสร้าง post ใหม่)
+- ❌ `approved` → `pending_approval` (ห้าม undo)
+- ❌ `pending_approval` → `pending_approval` (idempotent approve ต้อง 409)
+
+**ข้อยกเว้น:** ทุก transition ต้องผ่าน `state-machine.ts` ใน Backend — controller ไม่สามารถ UPDATE status ตรงๆ ได้
+
+---
+
+## 4. State Machine Implementation
+
+### 4.1 ไฟล์: `src/modules/posts/state-machine.ts`
+
+```typescript
+export type PostStatus =
+  | 'draft'
+  | 'generating'
+  | 'pending_approval'
+  | 'approved'
+  | 'posted'
+  | 'rejected'
+  | 'expired'
+  | 'failed';
+
+const allowedTransitions: Record<PostStatus, PostStatus[]> = {
+  draft:             ['generating', 'failed'],
+  generating:        ['pending_approval', 'failed'],
+  pending_approval:  ['approved', 'rejected', 'expired', 'failed'],
+  approved:          ['posted', 'failed'],
+  posted:            [],
+  rejected:          [],
+  expired:           [],
+  failed:            [],
+};
+
+export function canTransition(from: PostStatus, to: PostStatus): boolean {
+  return allowedTransitions[from]?.includes(to) ?? false;
+}
+
+export class PostStateMachine {
+  static transition(post: Post, to: PostStatus, ctx: TransitionContext) {
+    if (!canTransition(post.status, to)) {
+      throw new InvalidStateError(post.status, to);
+    }
+    post.status = to;
+    // side effects per transition (e.g., set posted_at when → posted)
+  }
+}
+```
+
+### 4.2 การใช้งานใน Controller
+
+```typescript
+// ❌ ห้ามทำแบบนี้
+@Post(':id/approve')
+async approve(@Param('id') id: string) {
+  await this.posts.update(id, { status: 'approved' });  // ผิด! bypass state machine
+}
+
+// ✅ ต้องทำแบบนี้
+@Post(':id/approve')
+async approve(@Param('id') id: string, @Body() dto: ApproveDto) {
+  const post = await this.posts.findOneOrFail(id);
+  PostStateMachine.transition(post, 'approved', { actor: 'user', ...dto });
+  return this.posts.save(post);
+}
+```
+
+---
+
+## 5. Side Effects per Transition
+
+### 5.1 `generating` → `pending_approval`
+
+```typescript
+// ใน callback handler
+post.status = 'pending_approval';
+post.approval_deadline = post.scheduled_at;  // = scheduled_at
+// INSERT notification
+// Enqueue email "post-ready"
+```
+
+### 5.2 `pending_approval` → `approved`
+
+```typescript
+// ใน approve handler
+post.status = 'approved';
+if (dto.caption) post.caption = dto.caption;
+if (dto.scheduledAt) {
+  post.scheduled_at = dto.scheduledAt;
+  post.approval_deadline = dto.scheduledAt;
+}
+```
+
+### 5.3 `pending_approval` → `expired`
+
+```typescript
+// ใน expire cron
+post.status = 'expired';
+post.rejection_reason = 'timeout';
+// INSERT notification (type=post_expired)
+// Enqueue email "post-expired"
+```
+
+### 5.4 `pending_approval` → `rejected`
+
+```typescript
+// ใน reject handler
+post.status = 'rejected';
+post.rejection_reason = 'user_rejected';
+if (dto.reason) post.error_message = dto.reason;
+```
+
+### 5.5 `approved` → `posted`
+
+```typescript
+// ใน dispatch-due-posts cron
+post.status = 'posted';
+post.posted_at = new Date();
+post.fb_post_id = result.id;
+// INSERT notification (type=post_posted)
+// Enqueue email "post-posted"
+```
+
+### 5.6 `*` → `failed`
+
+```typescript
+post.status = 'failed';
+post.error_code = ctx.errorCode;
+post.error_message = ctx.errorMessage;
+// INSERT notification (type=post_failed)
+// Enqueue email "post-failed"
+```
+
+---
+
+## 6. UI Display per Status
+
+| Status | Dashboard Card | Post Detail Page |
+|---|---|---|
+| `draft` | ไม่แสดง (internal) | ไม่แสดง |
+| `generating` | ไม่แสดง (internal) | "AI กำลังสร้างโพสต์..." + spinner |
+| `pending_approval` | "⏰ รออนุมัติ" + countdown | ปุ่ม "อนุมัติ/ปฏิเสธ" + แก้ caption/time |
+| `approved` | "✅ อนุมัติแล้ว" + เวลาจะโพสต์ | "จะโพสต์เวลา XX:XX" (read-only) |
+| `posted` | "✅ เผยแพร่แล้ว" + ลิงก์ FB | "โพสต์สำเร็จ" + ลิงก์ FB |
+| `rejected` | ไม่แสดงบน dashboard | "❌ ปฏิเสธแล้ว" (ประวัติ) |
+| `expired` | ไม่แสดงบน dashboard | "⏰ หมดเวลา" (ประวัติ) |
+| `failed` | ไม่แสดงบน dashboard | "⚠️ ล้มเหลว" + error (ประวัติ) |
+
+ดูเพิ่ม: [`contracts/FRONTEND.md`](./contracts/FRONTEND.md) section 5.1
+
+---
+
+## 7. Terminal States Behavior
+
+Posts ใน `posted`, `rejected`, `expired`, `failed` เป็น terminal — ไม่สามารถเปลี่ยนแปลงได้อีก
+
+**สิ่งที่ user ทำได้กับ terminal posts:**
+- ดู read-only
+- (อาจ) คลิก "สร้างโพสต์ใหม่" เพื่อ generate post ใหม่ (Phase 4)
+
+**สิ่งที่ user ทำไม่ได้:**
+- แก้ caption
+- Re-approve
+- Re-dispatch
+
+---
+
+## 8. Edge Cases
+
+### 8.1 User approve หลัง scheduled_at แต่ก่อน cron ทำงาน
+
+- status: `pending_approval` → `approved`
+- scheduled_at: < now
+- Cron dispatch รอบถัดไป (≤ 1 นาที) → dispatch ทันที
+- ✅ ทำงานถูกต้อง
+
+### 8.2 User approve ขณะ expire cron กำลังทำงาน
+
+- Race condition: ทั้ง approve และ expire พร้อมกัน
+- **Backend ใช้ `SELECT ... FOR UPDATE` ใน transaction** เพื่อ serialize
+- ถ้า expire ชนะก่อน → approve ได้ 409 `invalid_state`
+- ถ้า approve ชนะก่อน → expire ไม่ทำอะไร (status เปลี่ยนแล้ว)
+
+### 8.3 Dispatch fail หลัง approve
+
+- status: `approved` → `failed`
+- Email แจ้ง user
+- User ต้องสร้าง post ใหม่ (ไม่มี retry ใน MVP)
+
+### 8.4 AI fail ทั้ง caption และ media
+
+- ถ้า 1 ใน 2 fail → retry เฉพาะตัวที่ fail
+- ถ้าทั้งคู่ fail 3 ครั้ง → post = `failed`
+
+---
+
+## 9. อ่านเพิ่มเติม
+
+- [`02-DATA-MODEL.md`](./02-DATA-MODEL.md) — `posts` schema
+- [`04-DAILY-DECISION.md`](./04-DAILY-DECISION.md) — เริ่มต้นจากไหน
+- [`05-AUTO-REJECT.md`](./05-AUTO-REJECT.md) — flow auto-reject
+- [`contracts/FRONTEND.md`](./contracts/FRONTEND.md) — UI แสดงผลแต่ละ status
+
+อัปเดตล่าสุด: 2026-06-27
