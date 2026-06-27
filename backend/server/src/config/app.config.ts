@@ -14,6 +14,12 @@ export default registerAs('app', () => ({
   },
   internalApiKey: process.env.INTERNAL_API_KEY || 'dev-internal-api-key',
   fbTokenEncryptionKey: process.env.FB_TOKEN_ENCRYPTION_KEY || '',
+  facebook: {
+    appId: process.env.FB_APP_ID || '',
+    appSecret: process.env.FB_APP_SECRET || '',
+    redirectUri: process.env.FB_REDIRECT_URI || 'http://localhost:3000/facebook/oauth/callback',
+    graphVersion: process.env.FB_GRAPH_VERSION || 'v19.0',
+  },
   ai: {
     decisionUrl: process.env.AI_DECISION_URL || 'http://localhost:4001',
     captionUrl: process.env.AI_CAPTION_URL || 'http://localhost:4002',

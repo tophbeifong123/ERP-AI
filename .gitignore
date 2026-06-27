@@ -19,6 +19,7 @@ out/
 .env
 .env.local
 .env.*.local
+!.env.example
 
 # Logs
 *.log
@@ -29,6 +30,7 @@ yarn-error.log*
 
 # Testing
 coverage/
+.nyc_output
 
 # Editor / IDE
 .vscode/
@@ -45,3 +47,48 @@ Thumbs.db
 # Misc
 .vercel
 next-env.d.ts
+
+# NestJS debug
+nest-cli.json.bak
+tsconfig.build.tsbuildinfo
+
+# Docker / runtime
+*.pid
+*.seed
+*.pid.lock
+
+# AI stubs (mocked services — generated assets)
+ai-stubs/**/dist/
+ai-stubs/**/node_modules/
+ai-stubs/**/placeholder-assets/
+ai-stubs/**/.env
+
+# Postman — local-only
+postman/PostmanLocal/
+postman/**/*-local.postman_environment.json
+postman/**/*.postman_test_run.json
+# Note: ERP-AI.postman_collection.json and ERP-AI.postman_environment.json ARE committed (shared)
+
+# Local logs
+logs/
+*.local.log
+server.log
+server*.log
+
+# Claude / opencode local state
+.claude/
+.opencode/
+.opencode-state/
+
+# Caches
+.cache/
+.turbo/
+.parcel-cache/
+.eslintcache
+
+# Test artifacts
+test-results/
+playwright-report/
+playwright/.cache/
+cypress/videos/
+cypress/screenshots/

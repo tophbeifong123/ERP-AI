@@ -1,0 +1,2701 @@
+{
+  "info": {
+    "_postman_id": "erp-ai-collection-v1",
+    "name": "ERP-AI (MarketMate) — Full Backend Test",
+    "description": "End-to-end test collection for the P0/P1/P2 backend. Run folders in order; the tests in each request auto-store tokens/IDs into env vars. See README.md for the full flow walkthrough.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0"
+  },
+  "item": [
+    {
+      "name": "00 Health",
+      "id": "f-health",
+      "description": "",
+      "item": [
+        {
+          "name": "01 Health Check (public)",
+          "id": "r-health-01",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/health",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "health"
+              ]
+            },
+            "description": "Public health endpoint. Returns 200 with subsystem statuses or 503 if degraded."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));\npm.expect(pm.response.json().db).to.eql(\"ok\");\npm.expect(pm.response.json().redis).to.eql(\"ok\");\npm.expect(pm.response.json().storage).to.eql(\"ok\");"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "01 Auth",
+      "id": "f-auth",
+      "description": "",
+      "item": [
+        {
+          "name": "01 Register (Alice)",
+          "id": "r-auth-01",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Create a new user. Sends a verification email via BullMQ to Mailhog (http://localhost:8025).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); if (j.user && j.user.id) pm.environment.set('user_id', j.user.id);\npm.test(\"Status 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Verify Email (POST JSON)",
+          "id": "r-auth-02",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/verify-email",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "description": "Verify using the token from Mailhog. ⚠️ Set `email_verification_token` env var first (copy from Mailhog URL).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{email_verification_token}}\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));\npm.expect(pm.response.json().message).to.eql(\"verified\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Login",
+          "id": "r-auth-03",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login. Auto-saves access_token, refresh_token, user_id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();if (j.accessToken) { pm.environment.set('access_token', j.accessToken); pm.environment.set('refresh_token', j.refreshToken); }if (j.user) pm.environment.set('user_id', j.user.id);\npm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Refresh Token",
+          "id": "r-auth-04",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/refresh",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "refresh"
+              ]
+            },
+            "description": "Rotate refresh token. Old token revoked, new one issued.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); pm.environment.set('refresh_token', j.refreshToken); pm.environment.set('access_token', j.accessToken);\npm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Logout (Public)",
+          "id": "r-auth-05",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/logout",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "logout"
+              ]
+            },
+            "description": "Revoke current refresh token. No Authorization header required.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"refreshToken\": \"{{refresh_token}}\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Verify Email Landing (GET)",
+          "id": "r-auth-06",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/verify-email?token={{email_verification_token}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email?token={{email_verification_token}}"
+              ]
+            },
+            "description": "Browser-facing HTML page that verifies and redirects. Returns HTML 200."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTML 200\", () => { pm.response.to.have.status(200); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"text/html\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Change Password",
+          "id": "r-auth-07",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/change-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "change-password"
+              ]
+            },
+            "description": "Change password. Requires auth. Revokes all OTHER refresh tokens (current stays if you pass refreshToken in body).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"oldPassword\": \"{{password}}\",\n  \"newPassword\": \"{{password}}\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Register Bob (for cross-user tests)",
+          "id": "r-auth-08",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Create a second user for cross-user forbidden tests.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{bob_email}}\",\n  \"password\": \"{{bob_password}}\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 Login Bob",
+          "id": "r-auth-09",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Login Bob. Auto-saves bob_access_token.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{bob_email}}\",\n  \"password\": \"{{bob_password}}\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json();if (j.accessToken) { pm.environment.set('bob_access_token', j.accessToken); }if (j.user) pm.environment.set('bob_user_id', j.user.id);\npm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "10 Forgot Password",
+          "id": "r-auth-10",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/forgot-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "forgot-password"
+              ]
+            },
+            "description": "Always returns 202. If email exists, sends reset link to Mailhog.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 202\", () => pm.response.to.have.status(202));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "11 Reset Password Landing (GET)",
+          "id": "r-auth-11",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/auth/reset-password?token={{password_reset_token}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password?token={{password_reset_token}}"
+              ]
+            },
+            "description": "Redirects to frontend reset form. Copy token from Mailhog."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"HTML 200\", () => { pm.response.to.have.status(200); pm.expect(pm.response.headers.get(\"Content-Type\")).to.include(\"text/html\"); });"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "12 Reset Password (POST JSON)",
+          "id": "r-auth-12",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/reset-password",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "reset-password"
+              ]
+            },
+            "description": "Single-use. Revokes ALL refresh tokens. Set password_reset_token env first.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"{{password_reset_token}}\",\n  \"newPassword\": \"{{password}}\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "13 Login (negative: wrong password)",
+          "id": "r-auth-13",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/login",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "login"
+              ]
+            },
+            "description": "Should return 401 invalid_credentials.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"wrong-password\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));\npm.expect(pm.response.json().error).to.eql(\"invalid_credentials\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "14 Register (negative: short password)",
+          "id": "r-auth-14",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Should return 400 validation error.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"shortpass@example.com\",\n  \"password\": \"short\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "15 Register (negative: duplicate email)",
+          "id": "r-auth-15",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/register",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "register"
+              ]
+            },
+            "description": "Should return 409 email_taken.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"email\": \"{{email}}\",\n  \"password\": \"{{password}}\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 409\", () => pm.response.to.have.status(409));\npm.expect(pm.response.json().error).to.eql(\"email_taken\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "16 Verify (negative: bad token)",
+          "id": "r-auth-16",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/auth/verify-email",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "auth",
+                "verify-email"
+              ]
+            },
+            "description": "Should return 400 invalid_or_expired_token.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"token\": \"invalid-token-12345\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "02 Users",
+      "id": "f-users",
+      "description": "",
+      "item": [
+        {
+          "name": "01 GET /me",
+          "id": "r-users-01",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": "Get current user info."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 GET /me (no auth → 401)",
+          "id": "r-users-02",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": "Should return 401."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 DELETE /me (skipped — destructive)",
+          "id": "r-users-03",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/me",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "me"
+              ]
+            },
+            "description": "⚠️ Soft-deletes the user and revokes all refresh tokens. Don't run unless you want to start over."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "03 Businesses",
+      "id": "f-biz",
+      "description": "",
+      "item": [
+        {
+          "name": "01 Create Business (ai_decide)",
+          "id": "r-biz-01",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/businesses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "businesses"
+              ]
+            },
+            "description": "Create a business with autoPost=ai_decide. Auto-saves business_id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Acme Coffee\",\n  \"industry\": \"F&B\",\n  \"description\": \"Cozy coffee shop\",\n  \"tone\": \"friendly\",\n  \"keywords\": [\n    \"coffee\",\n    \"espresso\",\n    \"latte\"\n  ],\n  \"autoPost\": {\n    \"enabled\": true,\n    \"mode\": \"ai_decide\",\n    \"postsPerWeekTarget\": 3,\n    \"minGapDays\": 1\n  }\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); if (j.business && j.business.id) pm.environment.set('business_id', j.business.id);\npm.test(\"Status 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Create Business (fixed_schedule)",
+          "id": "r-biz-02",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/businesses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "businesses"
+              ]
+            },
+            "description": "Create a second business with fixed_schedule autoPost.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Bob's Bakery\",\n  \"industry\": \"Food\",\n  \"autoPost\": {\n    \"enabled\": true,\n    \"mode\": \"fixed_schedule\",\n    \"postsPerWeekTarget\": 2,\n    \"minGapDays\": 2,\n    \"fixedScheduleRules\": [\n      {\n        \"dayOfWeek\": 1,\n        \"time\": \"20:00\"\n      },\n      {\n        \"dayOfWeek\": 4,\n        \"time\": \"10:00\"\n      }\n    ]\n  }\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.environment.set(\"business2_id\", pm.response.json().business.id);\npm.test(\"Status 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 List My Businesses",
+          "id": "r-biz-03",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/businesses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "businesses"
+              ]
+            },
+            "description": "List all businesses owned by current user."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 GET /businesses/:id",
+          "id": "r-biz-04",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/businesses/{{business_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "businesses",
+                "{{business_id}}"
+              ]
+            },
+            "description": "Get one business. OwnerGuard checks ownership."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 PATCH /businesses/:id",
+          "id": "r-biz-05",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/businesses/{{business_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "businesses",
+                "{{business_id}}"
+              ]
+            },
+            "description": "Update business name/description.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"description\": \"Best coffee in town (updated)\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Upload Logo (multipart)",
+          "id": "r-biz-06",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/businesses/{{business_id}}/logo",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "businesses",
+                "{{business_id}}",
+                "logo"
+              ]
+            },
+            "description": "Upload logo as multipart/form-data. In Postman: Body → form-data → key 'logo' → File → pick a small PNG/JPG (<5MB)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 PATCH /businesses/:id/auto-post",
+          "id": "r-biz-07",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/businesses/{{business_id}}/auto-post",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "businesses",
+                "{{business_id}}",
+                "auto-post"
+              ]
+            },
+            "description": "Update auto-post config (mode + cadence + fixed schedule).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"enabled\": true,\n  \"mode\": \"fixed_schedule\",\n  \"postsPerWeekTarget\": 2,\n  \"minGapDays\": 2,\n  \"fixedScheduleRules\": [\n    {\n      \"dayOfWeek\": 1,\n      \"time\": \"20:00\"\n    },\n    {\n      \"dayOfWeek\": 4,\n      \"time\": \"10:00\"\n    }\n  ]\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Cross-User Forbidden (Bob → Alice)",
+          "id": "r-biz-08",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bob_access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/businesses/{{business_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "businesses",
+                "{{business_id}}"
+              ]
+            },
+            "description": "OwnerGuard should return 403 not_owner."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));\npm.expect(pm.response.json().message).to.eql(\"not_owner\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 List Businesses (no auth → 401)",
+          "id": "r-biz-09",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/businesses",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "businesses"
+              ]
+            },
+            "description": "Should return 401."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "04 Services",
+      "id": "f-svc",
+      "description": "",
+      "item": [
+        {
+          "name": "01 Create Service (Latte, 60 THB)",
+          "id": "r-svc-01",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/businesses/{{business_id}}/services",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "businesses",
+                "{{business_id}}",
+                "services"
+              ]
+            },
+            "description": "Create a service. price is in THB, stored as satang (priceMinor=6000).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"name\": \"Latte\",\n  \"description\": \"Creamy latte with oat milk\",\n  \"price\": 60,\n  \"currency\": \"THB\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); if (j.service && j.service.id) pm.environment.set('service_id', j.service.id);\npm.test(\"Status 201\", () => pm.response.to.have.status(201));\npm.expect(pm.response.json().service.priceMinor.toString()).to.match(/6000|6000n/);"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 List Services (active only)",
+          "id": "r-svc-02",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/businesses/{{business_id}}/services?active=true&page=1&limit=20",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "businesses",
+                "{{business_id}}",
+                "services?active=true&page=1&limit=20"
+              ]
+            },
+            "description": "List active services (paginated)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 GET /services/:id",
+          "id": "r-svc-03",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/services/{{service_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "services",
+                "{{service_id}}"
+              ]
+            },
+            "description": "Get one service."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 PATCH /services/:id (deactivate + price change)",
+          "id": "r-svc-04",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/services/{{service_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "services",
+                "{{service_id}}"
+              ]
+            },
+            "description": "Update service. isActive toggle included.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"isActive\": false,\n  \"price\": 75\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 DELETE /services/:id (skipped)",
+          "id": "r-svc-05",
+          "request": {
+            "method": "DELETE",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/services/{{service_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "services",
+                "{{service_id}}"
+              ]
+            },
+            "description": "⚠️ Soft-deletes the service."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 204\", () => pm.response.to.have.status(204));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "05 Facebook",
+      "id": "f-fb",
+      "description": "",
+      "item": [
+        {
+          "name": "01 OAuth Start (302 to Facebook)",
+          "id": "r-fb-01",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/facebook/oauth/start?businessId={{business_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "facebook",
+                "oauth",
+                "start?businessId={{business_id}}"
+              ]
+            },
+            "description": "Initiates Facebook OAuth. Returns 302 redirect to facebook.com. In a browser this starts the OAuth flow. In Postman, just observe the 302 + Location header."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"302 redirect\", () => pm.response.to.have.status(302));\npm.expect(pm.response.headers.get(\"Location\")).to.include(\"facebook.com\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 OAuth Callback (no code → redirect to FE)",
+          "id": "r-fb-02",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/facebook/oauth/callback",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "facebook",
+                "oauth",
+                "callback"
+              ]
+            },
+            "description": "Missing code/state → redirects to FE with fb=missing_params."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"302 redirect\", () => pm.response.to.have.status(302));\npm.expect(pm.response.headers.get(\"Location\")).to.include(\"fb=missing_params\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 List Connected Pages (no session yet → 400)",
+          "id": "r-fb-03",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/facebook/pages?businessId={{business_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "facebook",
+                "pages?businessId={{business_id}}"
+              ]
+            },
+            "description": "Returns 400 fb_session_expired unless OAuth flow completed in browser first."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.expect(pm.response.code).to.be.oneOf([400, 200]);"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "06 Posts",
+      "id": "f-posts",
+      "description": "",
+      "item": [
+        {
+          "name": "01 Create Post (manual)",
+          "id": "r-posts-01",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/posts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "posts"
+              ]
+            },
+            "description": "Create a manual post (status=draft). Auto-saves post_id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{business_id}}\",\n  \"caption\": \"Hello world!\",\n  \"postType\": \"product_showcase\",\n  \"generationSource\": \"manual\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); if (j.post && j.post.id) pm.environment.set('post_id', j.post.id);\npm.test(\"Status 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Create Post (auto_ai) — enqueues 3 AI jobs",
+          "id": "r-posts-02",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/posts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "posts"
+              ]
+            },
+            "description": "Auto_AI: enqueues caption + image + short_video jobs, transitions post to 'generating'. Auto-saves auto_ai_post_id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{business_id}}\",\n  \"postType\": \"product_showcase\",\n  \"generationSource\": \"auto_ai\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); if (j.post && j.post.id) pm.environment.set('auto_ai_post_id', j.post.id);\npm.test(\"Status 201\", () => pm.response.to.have.status(201));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 List Posts (filter by business)",
+          "id": "r-posts-03",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/posts?businessId={{business_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "posts?businessId={{business_id}}"
+              ]
+            },
+            "description": "List all posts for a business."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 GET /posts/:id",
+          "id": "r-posts-04",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/posts/{{post_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "posts",
+                "{{post_id}}"
+              ]
+            },
+            "description": "Get one post with media + aiJobs included."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 PATCH /posts/:id (edit caption in draft)",
+          "id": "r-posts-05",
+          "request": {
+            "method": "PATCH",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/posts/{{post_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "posts",
+                "{{post_id}}"
+              ]
+            },
+            "description": "Edits caption. Will 400 if post is approved/posted.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"caption\": \"Edited caption\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Try Approve Draft (should 400)",
+          "id": "r-posts-06",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/posts/{{post_id}}/approve",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "posts",
+                "{{post_id}}",
+                "approve"
+              ]
+            },
+            "description": "draft cannot go to approved. State machine should reject."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));\npm.expect(pm.response.json().error).to.eql(\"invalid_state_transition\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "07 Reject Post (in draft → 400)",
+          "id": "r-posts-07",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/posts/{{post_id}}/reject",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "posts",
+                "{{post_id}}",
+                "reject"
+              ]
+            },
+            "description": "draft cannot be rejected either. Run after 10.01 Caption Callback to test the happy path.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"reason\": \"user_rejected\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 400\", () => pm.response.to.have.status(400));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "08 Cross-User Forbidden (Bob → Alice)",
+          "id": "r-posts-08",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bob_access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/posts/{{post_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "posts",
+                "{{post_id}}"
+              ]
+            },
+            "description": "OwnerGuard should return 403 not_owner."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));\npm.expect(pm.response.json().message).to.eql(\"not_owner\");"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "09 List Posts (no auth → 401)",
+          "id": "r-posts-09",
+          "request": {
+            "method": "GET",
+            "header": [],
+            "url": {
+              "raw": "{{base_url}}/posts",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "posts"
+              ]
+            },
+            "description": "Should return 401."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "07 Content Plans",
+      "id": "f-plans",
+      "description": "",
+      "item": [
+        {
+          "name": "01 AI Decide Callback (creates content plan)",
+          "id": "r-plans-01",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Internal-Token",
+                "value": "{{internal_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/internal/ai/decide/callback",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "internal",
+                "ai",
+                "decide",
+                "callback"
+              ]
+            },
+            "description": "Simulates AI service sending a daily decision. Creates a content plan. Auto-saves content_plan_id.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"businessId\": \"{{business_id}}\",\n  \"shouldPostToday\": true,\n  \"reasoning\": \"Daily AI decision \\u2014 promo day\",\n  \"suggestedPostType\": \"product_showcase\",\n  \"suggestedCaptionHint\": \"Try our new drink!\",\n  \"suggestedScheduledAt\": \"2026-06-27T18:57:57.107461Z\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "const j = pm.response.json(); if (j.plan && j.plan.id) pm.environment.set('content_plan_id', j.plan.id);\npm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 List Content Plans",
+          "id": "r-plans-02",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/content-plans?businessId={{business_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "content-plans?businessId={{business_id}}"
+              ]
+            },
+            "description": "List all plans for a business."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 GET /content-plans/:id",
+          "id": "r-plans-03",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/content-plans/{{content_plan_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "content-plans",
+                "{{content_plan_id}}"
+              ]
+            },
+            "description": "Get one plan."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Materialize Plan (creates Post in draft)",
+          "id": "r-plans-04",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/content-plans/{{content_plan_id}}/materialize",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "content-plans",
+                "{{content_plan_id}}",
+                "materialize"
+              ]
+            },
+            "description": "Plan → Post. Requires OwnerGuard. Returns {plan, post}."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Cancel Plan",
+          "id": "r-plans-05",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/content-plans/{{content_plan_id}}/cancel",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "content-plans",
+                "{{content_plan_id}}",
+                "cancel"
+              ]
+            },
+            "description": "Cancel a plan (if not already materialized/cancelled)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 Cross-User Forbidden (Bob → Alice's plan)",
+          "id": "r-plans-06",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{bob_access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/content-plans/{{content_plan_id}}/cancel",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "content-plans",
+                "{{content_plan_id}}",
+                "cancel"
+              ]
+            },
+            "description": "Should return 403 not_owner."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 403\", () => pm.response.to.have.status(403));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "08 AI Jobs",
+      "id": "f-aijobs",
+      "description": "",
+      "item": [
+        {
+          "name": "01 List All AI Jobs",
+          "id": "r-aijobs-01",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai-jobs",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ai-jobs"
+              ]
+            },
+            "description": "List all AI jobs for the current user's posts."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 List AI Jobs (filter by auto_ai post)",
+          "id": "r-aijobs-02",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai-jobs?postId={{auto_ai_post_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ai-jobs?postId={{auto_ai_post_id}}"
+              ]
+            },
+            "description": "Should show 3 jobs (caption, image, short_video) for the auto_ai post."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 List AI Jobs (filter by type)",
+          "id": "r-aijobs-03",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai-jobs?type=caption",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ai-jobs?type=caption"
+              ]
+            },
+            "description": "Filter by type."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 GET /ai-jobs/:id (uses env ai_job_id)",
+          "id": "r-aijobs-04",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai-jobs/{{ai_job_id}}",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ai-jobs",
+                "{{ai_job_id}}"
+              ]
+            },
+            "description": "Get one AI job. The ai_job_id env defaults to 11111111-... (INSERT a row first — see README)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Retry AI Job",
+          "id": "r-aijobs-05",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/ai-jobs/{{ai_job_id}}/retry",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "ai-jobs",
+                "{{ai_job_id}}",
+                "retry"
+              ]
+            },
+            "description": "Re-queue a failed job. No-op if not failed."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "09 Notifications",
+      "id": "f-notif",
+      "description": "",
+      "item": [
+        {
+          "name": "01 List Notifications (after 10.01 caption callback)",
+          "id": "r-notif-01",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications"
+              ]
+            },
+            "description": "Should show post_ready notification after 10.01 Caption Callback + 06.02 Create Post (auto_ai)."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 List Unread Only",
+          "id": "r-notif-02",
+          "request": {
+            "method": "GET",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications?unreadOnly=true",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications?unreadOnly=true"
+              ]
+            },
+            "description": "Filter unread."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 POST /notifications/read-all",
+          "id": "r-notif-03",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Authorization",
+                "value": "Bearer {{access_token}}",
+                "type": "text"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/notifications/read-all",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "notifications",
+                "read-all"
+              ]
+            },
+            "description": "Mark all unread as read."
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    },
+    {
+      "name": "10 Internal AI Callbacks",
+      "id": "f-internal",
+      "description": "",
+      "item": [
+        {
+          "name": "01 Caption Callback (draft → pending_approval)",
+          "id": "r-internal-01",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Internal-Token",
+                "value": "{{internal_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/internal/ai/caption/callback",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "internal",
+                "ai",
+                "caption",
+                "callback"
+              ]
+            },
+            "description": "Simulates AI caption service finishing. ⚠️ INSERT an ai_jobs row first (see README). Sets post caption, transitions to pending_approval, fires post_ready event (notification + email).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"{{ai_job_id}}\",\n  \"caption\": \"AI-generated caption from Postman!\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "02 Image Callback",
+          "id": "r-internal-02",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Internal-Token",
+                "value": "{{internal_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/internal/ai/image/callback",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "internal",
+                "ai",
+                "image",
+                "callback"
+              ]
+            },
+            "description": "Simulates AI image generation done.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"{{ai_job_id}}\",\n  \"fileId\": \"00000000-0000-0000-0000-000000000001\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "03 Short Video Callback",
+          "id": "r-internal-03",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Internal-Token",
+                "value": "{{internal_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/internal/ai/short_video/callback",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "internal",
+                "ai",
+                "short_video",
+                "callback"
+              ]
+            },
+            "description": "Simulates AI short video generation done.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"{{ai_job_id}}\",\n  \"fileId\": \"00000000-0000-0000-0000-000000000002\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "04 Job Fail (with retry)",
+          "id": "r-internal-04",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Internal-Token",
+                "value": "{{internal_token}}",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/internal/ai/job/fail",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "internal",
+                "ai",
+                "job",
+                "fail"
+              ]
+            },
+            "description": "Simulates AI job failure. Increments attempts, sets nextRunAt for retry (or fails at maxAttempts).",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"{{ai_job_id}}\",\n  \"errorCode\": \"E_TEST\",\n  \"errorMessage\": \"Test failure from Postman\",\n  \"retryInMs\": 5000\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 200\", () => pm.response.to.have.status(200));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "05 Bad internal token → 401",
+          "id": "r-internal-05",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "X-Internal-Token",
+                "value": "wrong-token",
+                "type": "text"
+              },
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/internal/ai/caption/callback",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "internal",
+                "ai",
+                "caption",
+                "callback"
+              ]
+            },
+            "description": "Missing or wrong X-Internal-Token → 401.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"{{ai_job_id}}\",\n  \"caption\": \"should fail\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        },
+        {
+          "name": "06 No internal token → 401",
+          "id": "r-internal-06",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json"
+              }
+            ],
+            "url": {
+              "raw": "{{base_url}}/internal/ai/caption/callback",
+              "host": [
+                "{{base_url}}"
+              ],
+              "path": [
+                "internal",
+                "ai",
+                "caption",
+                "callback"
+              ]
+            },
+            "description": "No X-Internal-Token header at all → 401.",
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"jobId\": \"{{ai_job_id}}\",\n  \"caption\": \"should fail\"\n}"
+            }
+          },
+          "response": [],
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "type": "text/javascript",
+                "exec": [
+                  "pm.test(\"Status 401\", () => pm.response.to.have.status(401));"
+                ]
+              }
+            }
+          ]
+        }
+      ]
+    }
+  ],
+  "event": [
+    {
+      "listen": "prerequest",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global pre-request hook",
+          "console.log('--- pre-request: ' + pm.info.requestName + ' [' + pm.request.method + ' ' + pm.request.url.toString() + ']');"
+        ]
+      }
+    },
+    {
+      "listen": "test",
+      "script": {
+        "type": "text/javascript",
+        "exec": [
+          "// Global test hook: log response",
+          "console.log('--- response: ' + pm.response.code + ' ' + pm.response.status + ' for ' + pm.info.requestName);"
+        ]
+      }
+    }
+  ],
+  "variable": [
+    {
+      "key": "base_url",
+      "value": "http://localhost:3000"
+    }
+  ]
+}

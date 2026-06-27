@@ -1,4 +1,4 @@
-import { Injectable } from '@nestjs/common';
+import { Inject, Injectable } from '@nestjs/common';
 import { DataSource } from 'typeorm';
 import Redis from 'ioredis';
 import { S3Service } from '../files/s3.service';
@@ -19,7 +19,7 @@ export class HealthService {
 
   constructor(
     private dataSource: DataSource,
-    private redis: Redis,
+    @Inject('REDIS_CLIENT') private redis: Redis,
     private s3Service: S3Service,
   ) {}
 
