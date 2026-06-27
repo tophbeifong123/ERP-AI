@@ -12,6 +12,8 @@ class Settings(BaseSettings):
 
     AI_MEDIA_SERVICE_URL: str = "http://localhost:8001"
 
+    GROQ_API_KEY: str = ""
+
     model_config = {"env_file": ".env", "extra": "ignore"}
 
 
