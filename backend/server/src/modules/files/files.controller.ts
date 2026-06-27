@@ -1,12 +1,9 @@
-import { Controller, Post, Param, UseInterceptors, UploadedFile, BadRequestException, UseGuards } from '@nestjs/common';
+import { Controller, Post, Param, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FilesService } from './files.service';
-import { JwtAuthGuard } from '../../common/guards/jwt-auth.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
-import { ResourceType } from '../../common/decorators/resource-type.decorator';
 
 @Controller('files')
-@UseGuards(JwtAuthGuard)
 export class FilesController {
   constructor(private filesService: FilesService) {}
 

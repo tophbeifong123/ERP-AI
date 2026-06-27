@@ -7,5 +7,6 @@ import { FilesModule } from '../files/files.module';
   imports: [FilesModule],
   controllers: [HealthController],
   providers: [HealthService],
+  exports: [HealthService],
 })
 export class HealthModule {}
