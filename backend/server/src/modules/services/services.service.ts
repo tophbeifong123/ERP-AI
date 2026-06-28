@@ -64,7 +64,8 @@ export class ServicesService {
       currency: dto.currency ?? 'THB',
       imageFileId,
     });
-    return this.serviceRepo.save(service);
+    const saved = await this.serviceRepo.save(service);
+    return this.getOne(saved.id);
   }
 
   async listForBusiness(
@@ -75,6 +76,7 @@ export class ServicesService {
     if (opts.active !== undefined) where.isActive = opts.active;
     const [services, total] = await this.serviceRepo.findAndCount({
       where,
+      relations: { image: true },
       order: { createdAt: 'DESC' },
       skip: (opts.page - 1) * opts.limit,
       take: opts.limit,
@@ -85,6 +87,7 @@ export class ServicesService {
   async getOne(id: string): Promise<Service> {
     const service = await this.serviceRepo.findOne({
       where: { id, deletedAt: IsNull() },
+      relations: { image: true },
     });
     if (!service) {
       throw new NotFoundException({
@@ -102,7 +105,8 @@ export class ServicesService {
     if (dto.price !== undefined) service.priceMinor = dto.price * 100;
     if (dto.currency !== undefined) service.currency = dto.currency;
     if (dto.isActive !== undefined) service.isActive = dto.isActive;
-    return this.serviceRepo.save(service);
+    await this.serviceRepo.save(service);
+    return this.getOne(id);
   }
 
   async softDelete(id: string): Promise<void> {
