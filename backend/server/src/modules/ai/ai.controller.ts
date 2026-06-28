@@ -1,5 +1,5 @@
 import { Body, Controller, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post } from '@nestjs/common';
-import { AiService, CaptionDto, DecideDto, FailDto, ImageCallbackDto, ShortVideoCallbackDto } from './ai.service';
+import { AiService, CaptionDto, DecideDto, FailDto, MediaCallbackDto } from './ai.service';
 import { Public } from '../../common/decorators/public.decorator';
 import { InternalTokenGuard } from '../../common/guards/internal-token.guard';
 import { UseGuards } from '@nestjs/common';
@@ -28,17 +28,17 @@ export class AiController {
   @Public()
   @Post('image/callback')
   @HttpCode(HttpStatus.OK)
-  async imageCallback(@Body() dto: ImageCallbackDto) {
-    const post = await this.aiService.imageCallback(dto);
-    return { post };
+  async imageCallback(@Body() dto: MediaCallbackDto) {
+    const result = await this.aiService.mediaCallback(dto);
+    return { job: result.job, post: result.post, file: result.file, postMedia: result.postMedia };
   }
 
   @Public()
   @Post('short_video/callback')
   @HttpCode(HttpStatus.OK)
-  async shortVideoCallback(@Body() dto: ShortVideoCallbackDto) {
-    const post = await this.aiService.shortVideoCallback(dto);
-    return { post };
+  async shortVideoCallback(@Body() dto: MediaCallbackDto) {
+    const result = await this.aiService.mediaCallback(dto);
+    return { job: result.job, post: result.post, file: result.file, postMedia: result.postMedia };
   }
 
   @Public()

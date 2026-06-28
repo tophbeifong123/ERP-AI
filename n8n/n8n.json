@@ -1,42 +1,62 @@
 {
-  "name": "AI Content Generation - Image & Short Video (Gemini)",
+  "name": "AI Media Generation - Image & Short Video (MinIO + Callback)",
   "nodes": [
     {
       "parameters": {
         "httpMethod": "POST",
-        "path": "generate-content",
+        "path": "generate-media",
         "authentication": "headerAuth",
         "responseMode": "responseNode",
         "options": {}
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [
-        -1184,
-        480
-      ],
-      "id": "1c66d1d2-30a4-466e-af9c-204c09186b56",
-      "name": "Webhook - Content Request",
-      "webhookId": "gen-content-wh-001",
+      "position": [-1280, 480],
+      "id": "wh-media-001",
+      "name": "Webhook - Media Request",
+      "webhookId": "ai-media-webhook-001",
       "credentials": {
         "httpHeaderAuth": {
-          "id": "FR5dt0GYTyfmKheB",
-          "name": "Header Auth account 2"
+          "id": "INTERNAL_TOKEN_CRED",
+          "name": "Internal Token (X-Internal-Token)"
         }
       }
     },
     {
       "parameters": {
-        "jsCode": "// Normalize + validate the incoming request from the Marketing Strategy AI agent.\nconst body = $input.first().json.body || $input.first().json;\nconst contentType = body.content_type;\nconst callbackUrl = body.callback_url || null;\n\n// --- Validation ---\nif (!contentType || !['image', 'short_video'].includes(contentType)) {\n  const err = new Error(`Invalid or missing content_type: '${contentType}'. Must be 'image' or 'short_video'.`);\n  err.httpCode = 400;\n  throw err;\n}\n\n// Normalize scenes\nlet scenes = [];\nif (contentType === 'short_video') {\n  if (Array.isArray(body.scenes)) {\n    scenes = body.scenes.filter(s => s && typeof s.prompt === 'string' && s.prompt.trim().length >= 10);\n  } else if (typeof body.prompt === 'string' && body.prompt.trim().length >= 10) {\n    scenes = [{ prompt: body.prompt.trim() }];\n  }\n  \n  if (scenes.length === 0) {\n    const err = new Error('Field \"scenes\" (array of scene objects with prompts) or \"prompt\" (string, min 10 chars) is required for short_video.');\n    err.httpCode = 400;\n    throw err;\n  }\n} else {\n  // For images, we still expect a single prompt\n  const prompt = body.prompt;\n  if (!prompt || typeof prompt !== 'string' || prompt.trim().length < 10) {\n    const err = new Error('Field \"prompt\" is required and must be at least 10 characters.');\n    err.httpCode = 400;\n    throw err;\n  }\n  scenes = [{ prompt: prompt.trim() }];\n}\n\n// --- Reference image: accept a single URL or an array of URLs (max 3 for Veo, used as edit refs for images) ---\nlet refUrls = [];\nif (Array.isArray(body.reference_image_urls)) {\n  refUrls = body.reference_image_urls.filter(u => typeof u === 'string' && u.trim());\n} else if (typeof body.reference_image_url === 'string' && body.reference_image_url.trim()) {\n  refUrls = [body.reference_image_url.trim()];\n}\nrefUrls = refUrls.slice(0, 3);\n\n// --- Normalize & set defaults ---\nconst validated = {\n  content_type: contentType,\n  callback_url: callbackUrl,\n  scenes: scenes,\n  style: body.style || 'modern_minimal',\n  aspect_ratio: body.aspect_ratio || (contentType === 'image' ? '1:1' : '9:16'),\n  brand_context: body.brand_context || {},\n  negative_prompt: body.negative_prompt || '',\n  reference_image_urls: refUrls,\n  has_reference: refUrls.length > 0,\n  metadata: {\n    ...(body.metadata || {}),\n    execution_id: $execution.id,\n    requested_at: new Date().toISOString()\n  }\n};\n\nreturn [{ json: validated }];"
+        "jsCode": "// Normalize the backend payload (docs/contracts/AI-MEDIA.md).\nconst body = $input.first().json.body || $input.first().json;\n\nconst jobId = body.jobId;\nconst postId = body.postId;\nconst type = body.type;\nconst postType = body.postType || null;\nconst callbackUrl = body.callbackUrl || null;\nconst upload = body.upload || null;\nconst business = body.business || {};\nconst caption = body.caption || '';\nconst referenceImageUrls = Array.isArray(body.referenceImageUrls) ? body.referenceImageUrls : [];\nconst featuredServices = Array.isArray(body.featuredServices) ? body.featuredServices : [];\n\nfunction fail(code, message) {\n  const e = new Error(message);\n  e.httpCode = code;\n  throw e;\n}\n\nif (!jobId) fail(400, 'Field \"jobId\" is required.');\nif (!postId) fail(400, 'Field \"postId\" is required.');\nif (!type || !['image', 'short_video'].includes(type)) fail(400, `Field \"type\" must be 'image' or 'short_video' (got '${type}').`);\nif (!upload || !upload.presignedUrl || !upload.storageKey) fail(400, 'Field \"upload.presignedUrl\" and \"upload.storageKey\" are required.');\nif (!callbackUrl) fail(400, 'Field \"callbackUrl\" is required.');\n\nconst refUrls = referenceImageUrls\n  .filter((u) => typeof u === 'string' && u.trim())\n  .slice(0, 3);\n\nconst mime = (upload.headers && (upload.headers['Content-Type'] || upload.headers['content-type'])) || (type === 'image' ? 'image/png' : 'video/mp4');\n\nreturn [{\n  json: {\n    jobId,\n    postId,\n    type,\n    postType,\n    callbackUrl,\n    upload: {\n      presignedUrl: upload.presignedUrl,\n      storageKey: upload.storageKey,\n      publicUrl: upload.publicUrl || upload.presignedUrl.split('?')[0],\n      headers: upload.headers || { 'Content-Type': mime },\n      maxBytes: upload.maxBytes || (type === 'image' ? 10485760 : 52428800),\n      mime,\n    },\n    business: {\n      id: business.id || null,\n      name: business.name || '',\n      industry: business.industry || '',\n      tone: business.tone || '',\n      keywords: Array.isArray(business.keywords) ? business.keywords : [],\n      logoPublicUrl: business.logoPublicUrl || null,\n    },\n    caption,\n    referenceImageUrls: refUrls,\n    hasReference: refUrls.length > 0,\n    featuredServices: featuredServices.map((s) => ({\n      id: s.id,\n      name: s.name,\n      imagePublicUrl: s.imagePublicUrl || null,\n    })),\n    style: postType || 'lifestyle',\n    aspect_ratio: '1:1',\n    metadata: { jobId, postId, type, postType },\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        -976,
-        480
-      ],
-      "id": "042bf782-56eb-4647-bcf3-4e0f1c85c000",
-      "name": "Validate Input"
+      "position": [-1040, 480],
+      "id": "node-validate",
+      "name": "Validate Input",
+      "onError": "continueErrorOutput",
+      "errorOutputBranch": [
+        { "branch": "image", "message": "Validation failed" }
+      ]
+    },
+    {
+      "parameters": {
+        "jsCode": "// Wrap any thrown error and POST a fail callback to the backend, then rethrow.\n// This is the error-handler for Validate Input.\nconst ctx = $('Validate Input').first().json || {};\nconst err = ($json && $json.error) || {};\nconst message = (err.message || err.description || 'Unknown error').toString().slice(0, 1000);\nif (ctx.callbackUrl && ctx.jobId) {\n  const payload = {\n    jobId: ctx.jobId,\n    error: { code: 'INVALID_REQUEST', message, type: ctx.type || 'unknown' },\n  };\n  try {\n    await this.helpers.httpRequest({\n      method: 'POST',\n      url: ctx.callbackUrl,\n      headers: { 'X-Internal-Token': process.env.INTERNAL_API_KEY || '' },\n      body: payload,\n      json: true,\n    });\n  } catch (e) {}\n}\nreturn [{ json: { ok: false, error: message } }];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [-820, 760],
+      "id": "node-err-callback",
+      "name": "Send Validation Error Callback"
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"error\",\n  \"code\": \"INVALID_REQUEST\",\n  \"message\": \"{{ $json.error }}\"\n}",
+        "options": { "responseCode": 400 }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [-560, 760],
+      "id": "node-err-ack",
+      "name": "Ack Validation Error (400)"
     },
     {
       "parameters": {
@@ -44,72 +64,44 @@
           "values": [
             {
               "conditions": {
-                "options": {
-                  "caseSensitive": true
-                },
+                "options": { "caseSensitive": true },
                 "conditions": [
-                  {
-                    "id": "cond-image",
-                    "leftValue": "={{ $json.content_type }}",
-                    "rightValue": "image",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
+                  { "id": "cond-image", "leftValue": "={{ $json.type }}", "rightValue": "image", "operator": { "type": "string", "operation": "equals" } }
                 ],
                 "combinator": "and"
               },
               "renameOutput": true,
-              "outputKey": "Image"
+              "outputKey": "image"
             },
             {
               "conditions": {
-                "options": {
-                  "caseSensitive": true
-                },
+                "options": { "caseSensitive": true },
                 "conditions": [
-                  {
-                    "id": "cond-video",
-                    "leftValue": "={{ $json.content_type }}",
-                    "rightValue": "short_video",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
+                  { "id": "cond-video", "leftValue": "={{ $json.type }}", "rightValue": "short_video", "operator": { "type": "string", "operation": "equals" } }
                 ],
                 "combinator": "and"
               },
               "renameOutput": true,
-              "outputKey": "Short Video"
+              "outputKey": "video"
             }
           ]
         },
-        "options": {
-          "fallbackOutput": "extra"
-        }
+        "options": { "fallbackOutput": "extra" }
       },
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [
-        -752,
-        480
-      ],
-      "id": "f5f43b35-6244-49b4-bfcf-1706f55e7b32",
-      "name": "Route by Content Type"
+      "position": [-800, 480],
+      "id": "node-route-type",
+      "name": "Route by Type"
     },
     {
       "parameters": {
-        "jsCode": "// Use Gemini (text) to turn the marketing brief into a rich Nano Banana image instruction.\nconst item = $input.first().json;\n\nconst systemPrompt = [\n  'You are an expert visual content designer specializing in social media marketing for Thai audiences.',\n  '',\n  'Given a marketing brief, brand context, and optionally reference images, write ONE detailed image-generation instruction for the Gemini native image model (Nano Banana).',\n  '',\n  'Rules:',\n  '1. Incorporate brand visual identity, palette and tone when provided.',\n  '2. Describe composition, subject, lighting, color scheme, mood, textures and camera framing.',\n  '3. Optimize the composition for the requested aspect ratio.',\n  '4. Do NOT include any text, typography, letters, words or logos in the image unless the brief explicitly asks for it.',\n  '5. If reference images are provided, describe how to keep their subject/style while applying the marketing requirements (this will be used for image editing).',\n  '6. Consider Thai cultural context and aesthetics when relevant.',\n  '7. Keep the instruction under 220 words, vivid, direct, and easy for the image model to follow.',\n  '8. Prefer one clear subject and a simple composition.',\n  '9. Do not ask for text, typography, logos, people, faces, hands, or body parts unless the brief explicitly requires them.',\n  '',\n  'Respond ONLY with the final image instruction. No preamble, no explanations.'\n].join('\\n');\n\nconst userParts = [\n  `Marketing brief: ${item.scenes[0].prompt}`,\n  `Style: ${item.style}`,\n  `Aspect ratio: ${item.aspect_ratio}`\n];\nif (item.brand_context && Object.keys(item.brand_context).length > 0) {\n  userParts.push(`Brand context: ${JSON.stringify(item.brand_context)}`);\n}\nif (item.has_reference) {\n  userParts.push(`Reference images provided: ${item.reference_image_urls.length} (the image model will receive them for editing).`);\n}\n\nreturn [{\n  json: {\n    original: item,\n    api_body: {\n      model: 'google/gemini-2.5-flash',\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user', content: userParts.join('\\n') }\n      ],\n      max_tokens: 700,\n      temperature: 0.7\n    }\n  }\n}];"
+        "jsCode": "const item = $input.first().json;\n\nconst systemPrompt = [\n  'You are an expert visual content designer specialising in social media marketing for Thai SMEs.',\n  '',\n  'Given a marketing caption and brand context, write ONE detailed image-generation instruction for the Gemini native image model (Nano Banana).',\n  '',\n  'Rules:',\n  '1. Reflect the brand tone, palette and any keywords provided.',\n  '2. Describe composition, subject, lighting, colour scheme, mood, textures and camera framing.',\n  '3. Optimise for a 1:1 social media post.',\n  '4. Do NOT include text, typography, letters, words or logos in the image.',\n  '5. If reference images are supplied, keep their subject while applying the marketing requirements.',\n  '6. Keep the instruction under 220 words, vivid, direct.',\n  '7. Do NOT depict people, faces, hands, or body parts.',\n  '',\n  'Respond ONLY with the final image instruction. No preamble, no explanations.'\n].join('\\n');\n\nconst userParts = [\n  `Post type: ${item.postType || 'lifestyle'}`,\n  `Caption: ${item.caption || '(none)'}`,\n  `Business: ${item.business.name} (${item.business.industry || 'general'})`,\n  `Tone: ${item.business.tone || 'friendly'}`,\n  `Keywords: ${(item.business.keywords || []).join(', ') || 'N/A'}`,\n  `Aspect ratio: ${item.aspect_ratio || '1:1'}`,\n];\nif (item.featuredServices && item.featuredServices.length) {\n  const services = item.featuredServices\n    .map((s) => `${s.name}${s.imagePublicUrl ? ' [ref image available]' : ''}`)\n    .join(', ');\n  userParts.push(`Featured services to visualise: ${services}`);\n}\nif (item.hasReference) {\n  userParts.push(`Reference images provided: ${item.referenceImageUrls.length}. The image model will receive them for editing.`);\n}\n\nreturn [{\n  json: {\n    original: item,\n    api_body: {\n      model: 'google/gemini-2.5-flash',\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user', content: userParts.join('\\n') }\n      ],\n      temperature: 0.7,\n      max_tokens: 400,\n    },\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        -512,
-        112
-      ],
-      "id": "c0621965-dfb0-4b31-9914-399b6f85daa3",
+      "position": [-560, 240],
+      "id": "node-prep-img-prompt",
       "name": "Prepare Image Prompt"
     },
     {
@@ -121,94 +113,67 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.api_body) }}",
-        "options": {
-          "timeout": 60000
-        }
+        "options": { "timeout": 60000 }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        -272,
-        112
-      ],
-      "id": "608df36b-44b5-4379-a8f3-d0082df31b38",
+      "position": [-320, 240],
+      "id": "node-enhance-img",
       "name": "Enhance Image Prompt (Gemini)",
       "retryOnFail": true,
       "maxTries": 5,
       "waitBetweenTries": 5000,
       "credentials": {
-        "googleOAuth2Api": {
-          "id": "l4X9AcceC8Sg790W",
-          "name": "Google account"
-        }
+        "googleOAuth2Api": { "id": "GOOGLE_OAUTH_PLACEHOLDER", "name": "Google account" }
       }
     },
     {
       "parameters": {
         "conditions": {
           "boolean": [
-            {
-              "value1": "={{ $('Prepare Image Prompt').first().json.original.has_reference }}",
-              "value2": true
-            }
+            { "value1": "={{ $('Validate Input').first().json.hasReference }}", "value2": true }
           ]
         }
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [
-        -32,
-        112
-      ],
-      "id": "dd5d11ab-6574-4bcb-8503-de4c62da0d84",
+      "position": [-80, 240],
+      "id": "node-has-ref-img",
       "name": "Has Ref Image?"
     },
     {
       "parameters": {
-        "fieldToSplitOut": "ref_urls",
+        "fieldToSplitOut": "referenceImageUrls",
         "options": {}
       },
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [
-        192,
-        -48
-      ],
-      "id": "25e7e9f3-2a04-46ba-a3b8-c642ad30c9c3",
-      "name": "Split Ref Urls"
+      "position": [160, 80],
+      "id": "node-split-refs",
+      "name": "Split Refs"
     },
     {
       "parameters": {
-        "url": "={{ $json.ref_urls }}",
+        "url": "={{ $json.referenceImageUrls }}",
         "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file"
-            }
-          },
+          "response": { "response": { "responseFormat": "file" } },
           "timeout": 30000
         }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        416,
-        -48
-      ],
-      "id": "3a59feb8-02f9-43ef-aaf5-6442395cc174",
-      "name": "Download Image Refs"
+      "position": [400, 80],
+      "id": "node-download-refs",
+      "name": "Download Refs"
     },
     {
       "parameters": {
-        "jsCode": "// Build the Gemini native image (Nano Banana) generateContent request.\nconst originalData = $('Prepare Image Prompt').first().json.original;\nconst gptResponse = $('Enhance Image Prompt (Gemini)').first().json;\nconst enhancedPrompt = gptResponse.choices[0].message.content.trim();\n\nconst imageInstruction = [\n  enhancedPrompt,\n  '',\n  'Create one clear image only.',\n  'Keep the composition simple and fully visual.',\n  'Do not include text, logos, letters, typography, people, faces, hands, or body parts unless the brief explicitly requires them.',\n  'If the subject is food or a product, show it clearly centered and highly detailed.'\n].join('\\n');\nconst parts = [{ text: imageInstruction }];\n\n// Collect reference images\nconst items = $input.all();\nfor (const it of items) {\n  const bin = it.binary && it.binary.data;\n  if (bin && bin.data) {\n    parts.push({\n      inlineData: {\n        mimeType: bin.mimeType || 'image/jpeg',\n        data: bin.data\n      }\n    });\n  }\n}\n\nconst ts = Date.now();\nconst campaignId = originalData.metadata.campaign_id || 'gen';\nconst filename = `img_${campaignId}_${ts}.png`;\n\nconst apiBody = {\n  contents: [\n    {\n      role: 'user',\n      parts: parts\n    }\n  ],\n  generationConfig: {\n    responseModalities: ['IMAGE'],\n    imageConfig: {\n      aspectRatio: originalData.aspect_ratio || '1:1'\n    }\n  }\n};\n\nreturn [{\n  json: {\n    original: originalData,\n    enhanced_prompt: enhancedPrompt,\n    aspect_ratio: originalData.aspect_ratio || '1:1',\n    filename: filename,\n    api_body: apiBody\n  }\n}];"
+        "jsCode": "const original = $('Validate Input').first().json;\nconst promptResp = $('Enhance Image Prompt (Gemini)').first().json;\nconst enhancedPrompt = promptResp.choices[0].message.content.trim();\n\nconst imageInstruction = [\n  enhancedPrompt,\n  '',\n  'Create one clear image only.',\n  'Keep the composition simple and fully visual.',\n  'Do not include text, logos, letters, typography, people, faces, hands, or body parts.',\n  'If the subject is food or a product, show it clearly centred and highly detailed.'\n].join('\\n');\nconst parts = [{ text: imageInstruction }];\n\nconst items = $input.all();\nfor (const it of items) {\n  const bin = it.binary && it.binary.data;\n  if (bin && bin.data) {\n    parts.push({\n      inlineData: {\n        mimeType: bin.mimeType || 'image/jpeg',\n        data: bin.data,\n      }\n    });\n  }\n}\n\nconst apiBody = {\n  contents: [{ role: 'user', parts }],\n  generationConfig: {\n    responseModalities: ['IMAGE'],\n    imageConfig: { aspectRatio: original.aspect_ratio || '1:1' },\n  },\n};\n\nreturn [{\n  json: {\n    original,\n    enhanced_prompt: enhancedPrompt,\n    aspect_ratio: original.aspect_ratio || '1:1',\n    api_body: apiBody,\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        640,
-        112
-      ],
-      "id": "4d63e10e-14ed-4b64-bc0a-649c1c3ea5d8",
+      "position": [640, 240],
+      "id": "node-build-img",
       "name": "Build Image Request"
     },
     {
@@ -220,138 +185,109 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.api_body) }}",
+        "options": { "timeout": 120000 }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [880, 240],
+      "id": "node-generate-img",
+      "name": "Generate Image (Nano Banana)",
+      "credentials": {
+        "googleOAuth2Api": { "id": "GOOGLE_OAUTH_PLACEHOLDER", "name": "Google account" }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "const response = $input.first().json;\nconst original = $('Validate Input').first().json;\nconst prepareData = $('Build Image Request').first().json;\n\nconst candidates = response.candidates || [];\nlet base64 = null;\nlet mime = 'image/png';\nfor (const cand of candidates) {\n  const parts = (cand.content && cand.content.parts) || [];\n  for (const p of parts) {\n    if (p.inlineData && p.inlineData.data) {\n      base64 = p.inlineData.data;\n      mime = p.inlineData.mimeType || mime;\n      break;\n    }\n  }\n  if (base64) break;\n}\nif (!base64) {\n  const finishReason = (response && response.candidates && response.candidates[0] && response.candidates[0].finishReason) || 'UNKNOWN';\n  const textParts = (response && response.candidates && response.candidates[0] && response.candidates[0].content && response.candidates[0].content.parts || [])\n    .filter((p) => p && typeof p.text === 'string' && p.text.trim())\n    .map((p) => p.text.trim())\n    .join('\\n');\n  throw new Error(\n    'Gemini image model returned no image. finishReason=' + finishReason + '; text=' + textParts.slice(0, 500)\n  );\n}\n\nconst ext = mime.includes('jpeg') ? 'jpg' : 'png';\nconst filename = 'img_' + original.jobId + '.' + ext;\nconst binaryData = await this.helpers.prepareBinaryData(\n  Buffer.from(base64, 'base64'),\n  filename,\n  mime,\n);\n\nreturn [{\n  json: {\n    original,\n    enhanced_prompt: prepareData.enhanced_prompt,\n    mime,\n    size_bytes: Buffer.from(base64, 'base64').length,\n  },\n  binary: { data: binaryData },\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [1120, 240],
+      "id": "node-convert-img-bin",
+      "name": "Convert Image to Binary"
+    },
+    {
+      "parameters": {
+        "method": "PUT",
+        "url": "={{ $('Validate Input').first().json.upload.presignedUrl }}",
+        "sendBody": true,
+        "specifyBody": "binary",
+        "binaryPropertyName": "data",
         "options": {
+          "response": { "response": { "responseFormat": "string" } },
           "timeout": 120000
         }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        880,
-        112
-      ],
-      "id": "ee2c78d3-d0a1-4ddb-a134-b9e2d019f3c4",
-      "name": "Generate Image (Nano Banana)",
-      "credentials": {
-        "googleOAuth2Api": {
-          "id": "l4X9AcceC8Sg790W",
-          "name": "Google account"
-        }
-      }
+      "position": [1360, 240],
+      "id": "node-upload-img-minio",
+      "name": "PUT Image to MinIO"
     },
     {
       "parameters": {
-        "jsCode": "// Extract generated image\nconst response = $input.first().json;\nconst prepareData = $('Build Image Request').first().json;\n\nconst candidates = response.candidates || [];\nlet base64Data = null;\nlet mimeType = 'image/png';\n\nfor (const cand of candidates) {\n  const partList = (cand.content && cand.content.parts) || [];\n  for (const p of partList) {\n    if (p.inlineData && p.inlineData.data) {\n      base64Data = p.inlineData.data;\n      mimeType = p.inlineData.mimeType || mimeType;\n      break;\n    }\n  }\n  if (base64Data) break;\n}\n\nif (!base64Data) {\n  const finishReason = response?.candidates?.[0]?.finishReason || 'UNKNOWN';\n  const textParts = (response?.candidates?.[0]?.content?.parts || [])\n    .filter(p => p && typeof p.text === 'string' && p.text.trim())\n    .map(p => p.text.trim())\n    .join('\\n');\n  const detail = [\n    'Gemini image model did not return image data.',\n    `finishReason: ${finishReason}`,\n    textParts ? `response_text: ${textParts.slice(0, 1000)}` : null,\n    `prompt: ${(prepareData.enhanced_prompt || '(none)').slice(0, 1000)}`\n  ].filter(Boolean).join(' | ');\n  throw new Error(detail);\n}\n\nconst ext = mimeType.includes('jpeg') ? 'jpg' : 'png';\nconst filename = prepareData.filename.replace(/\\.(png|jpg|jpeg)$/i, '.' + ext);\n\nconst binaryData = await this.helpers.prepareBinaryData(\n  Buffer.from(base64Data, 'base64'),\n  filename,\n  mimeType\n);\n\nreturn [{\n  json: {\n    original: prepareData.original,\n    enhanced_prompt: prepareData.enhanced_prompt,\n    filename: filename,\n    aspect_ratio: prepareData.aspect_ratio\n  },\n  binary: {\n    data: binaryData\n  }\n}];"
+        "jsCode": "const data = $('Convert Image to Binary').first().json;\nconst putResp = $('PUT Image to MinIO').first();\nconst status = putResp.statusCode || 0;\n\nif (!(status >= 200 && status < 300)) {\n  throw new Error('MinIO PUT for image returned status ' + status + ': ' + (putResp.body || '').toString().slice(0, 300));\n}\n\nconst upload = data.original.upload;\nconst payload = {\n  jobId: data.original.jobId,\n  result: {\n    storageKey: upload.storageKey,\n    publicUrl: upload.publicUrl,\n    mime: data.mime,\n    sizeBytes: data.size_bytes,\n    width: null,\n    height: null,\n    durationSec: null,\n  },\n};\n\nreturn [{\n  json: {\n    callbackUrl: data.original.callbackUrl,\n    payload,\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1120,
-        112
-      ],
-      "id": "eec1d547-32b2-49e0-9d2f-d780df082b37",
-      "name": "Convert Image to Binary"
+      "position": [1600, 240],
+      "id": "node-prepare-img-cb",
+      "name": "Prepare Image Callback"
     },
     {
       "parameters": {
-        "authentication": "serviceAccount",
-        "name": "={{ $('Convert Image to Binary').first().json.filename }}",
-        "driveId": {
-          "__rl": true,
-          "mode": "list",
-          "value": "My Drive",
-          "cachedResultName": "My Drive"
-        },
-        "folderId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "=YOUR_GOOGLE_DRIVE_FOLDER_ID"
-        },
-        "options": {}
+        "conditions": { "boolean": [{ "value1": "={{ !!$json.callbackUrl }}", "value2": true }] }
       },
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
-      "position": [
-        1360,
-        112
-      ],
-      "id": "d100f876-72c1-4169-800a-f30acc1a8861",
-      "name": "Upload Image",
+      "type": "n8n-nodes-base.if",
+      "typeVersion": 1,
+      "position": [1840, 240],
+      "id": "node-has-img-cb",
+      "name": "Has Callback?"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.callbackUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_API_KEY }}", "parameterType": "string" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": { "timeout": 30000 }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2080, 240],
+      "id": "node-send-img-cb",
+      "name": "Send Image Callback",
       "credentials": {
-        "googleApi": {
-          "id": "wt5Jm7glqfIXBKd3",
-          "name": "Google Service Account account"
-        }
+        "httpHeaderAuth": { "id": "INTERNAL_TOKEN_CRED", "name": "Internal Token (X-Internal-Token)" }
       }
-    },
-    {
-      "parameters": {
-        "jsCode": "const uploadResult = $input.first().json;\nconst imageData = $('Convert Image to Binary').first().json;\nconst startTime = new Date(imageData.original.metadata.requested_at).getTime();\nconst elapsed = Date.now() - startTime;\n\nreturn [{\n  json: {\n    success: true,\n    content_type: 'image',\n    asset: {\n      url: uploadResult.webViewLink || uploadResult.webContentLink || uploadResult.id,\n      drive_file_id: uploadResult.id,\n      name: uploadResult.name || imageData.filename,\n      mime_type: uploadResult.mimeType || 'image/png',\n      size_bytes: parseInt(uploadResult.size) || null\n    },\n    prompt_used: imageData.enhanced_prompt,\n    metadata: {\n      ...imageData.original.metadata,\n      model_used: 'gemini-3.1-flash-image',\n      aspect_ratio: imageData.aspect_ratio,\n      generation_time_ms: elapsed\n    }\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        1600,
-        112
-      ],
-      "id": "751061eb-1fd4-46d3-8838-b04c895a09f6",
-      "name": "Format Image Response"
     },
     {
       "parameters": {
         "respondWith": "json",
-        "responseBody": "={\n  \"success\": true,\n  \"status\": \"processing\",\n  \"execution_id\": \"{{ $json.metadata.execution_id }}\",\n  \"message\": \"Content generation started. Results will be sent to the callback URL if provided.\"\n}",
-        "options": {
-          "responseCode": 200
-        }
+        "responseBody": "={\n  \"status\": \"accepted\",\n  \"jobId\": \"{{ $('Validate Input').first().json.jobId }}\",\n  \"message\": \"Image generation in progress. Result will be POSTed to callbackUrl.\"\n}",
+        "options": { "responseCode": 202 }
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [
-        -512,
-        480
-      ],
-      "id": "5f24f3b3-b724-4a49-886c-ec2eb17fd812",
-      "name": "Respond to Webhook - Async"
+      "position": [-560, 720],
+      "id": "node-ack-img",
+      "name": "Acknowledge Image (202)"
     },
     {
       "parameters": {
-        "fieldToSplitOut": "scenes",
-        "options": {}
-      },
-      "type": "n8n-nodes-base.splitOut",
-      "typeVersion": 1,
-      "position": [
-        -304,
-        480
-      ],
-      "id": "8e7b06e4-3db0-41cb-9bd0-a5bbdcf332bc",
-      "name": "Split Scenes"
-    },
-    {
-      "parameters": {
-        "options": {}
-      },
-      "type": "n8n-nodes-base.splitInBatches",
-      "typeVersion": 3,
-      "position": [
-        -112,
-        480
-      ],
-      "id": "fb4815cd-31ed-4fe2-8259-3c60c7dce0fa",
-      "name": "Loop Scenes"
-    },
-    {
-      "parameters": {
-        "jsCode": "// Use Gemini (text) to turn the marketing brief into a detailed Veo prompt.\nconst item = $input.first().json;\n\nconst systemPrompt = [\n  'You are an expert short-form video content creator specializing in social media marketing.',\n  '',\n  'Given a marketing brief and brand context, write ONE detailed prompt for the Veo video model.',\n  '',\n  'Rules:',\n  '1. Describe scene composition, subject, action, camera movement and visual flow.',\n  '2. Specify mood, lighting and color grading.',\n  '3. Optimize for the requested aspect ratio (vertical 9:16 by default for social media).',\n  '4. Keep the scene simple, focused and visually striking — one clear subject and motion.',\n  '5. Avoid on-screen text, typography or complex multi-character interactions.',\n  '6. Avoid showing people, faces, hands, or body parts unless the brief explicitly requires them.',\n  '7. For food or product ads, keep the focus on the dish, ingredients, utensils, lighting, texture and motion.',\n  '8. Consider Thai cultural context when relevant.',\n  '9. If a reference image is provided it defines the subject/first frame; keep that subject consistent.',\n  '',\n  'Respond ONLY with the final video prompt. No explanations.'\n].join('\\n');\n\nconst userParts = [\n  `Marketing brief: ${item.prompt}`,\n  `Style: ${item.style}`,\n  `Aspect ratio: ${item.aspect_ratio}`\n];\nif (item.brand_context && Object.keys(item.brand_context).length > 0) {\n  userParts.push(`Brand context: ${JSON.stringify(item.brand_context)}`);\n}\nif (item.has_reference) {\n  userParts.push('A reference image will be supplied as the starting frame / subject.');\n}\nuserParts.push('Important: keep the scene food-focused, object-focused, and free from people, faces, hands, and body parts.');\n\nreturn [{\n  json: {\n    original: item,\n    api_body: {\n      model: 'google/gemini-2.5-flash',\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user', content: userParts.join('\\n') }\n      ],\n      max_tokens: 600,\n      temperature: 0.7\n    }\n  }\n}];"
+        "jsCode": "const item = $input.first().json;\n\nconst systemPrompt = [\n  'You are an expert short-form video content creator specialising in social media marketing.',\n  '',\n  'Given a marketing caption and brand context, write ONE detailed prompt for the Veo 3.1 video model.',\n  '',\n  'Rules:',\n  '1. Describe scene composition, subject, action, camera movement and visual flow.',\n  '2. Specify mood, lighting and colour grading.',\n  '3. Optimise for 9:16 (vertical, social media).',\n  '4. Keep the scene simple, focused and visually striking.',\n  '5. Avoid on-screen text, typography or multi-character interactions.',\n  '6. Do NOT depict people, faces, hands, or body parts.',\n  '7. For food or product ads, focus on the dish, ingredients, lighting, texture, motion.',\n  '8. If a reference image is provided, treat it as the starting frame and keep the subject consistent.',\n  '',\n  'Respond ONLY with the final video prompt. No explanations.'\n].join('\\n');\n\nconst userParts = [\n  `Post type: ${item.postType || 'lifestyle'}`,\n  `Caption: ${item.caption || '(none)'}`,\n  `Business: ${item.business.name} (${item.business.industry || 'general'})`,\n  `Tone: ${item.business.tone || 'friendly'}`,\n  `Keywords: ${(item.business.keywords || []).join(', ') || 'N/A'}`,\n  `Aspect ratio: 9:16`,\n];\nif (item.featuredServices && item.featuredServices.length) {\n  const services = item.featuredServices\n    .map((s) => `${s.name}${s.imagePublicUrl ? ' [ref image available]' : ''}`)\n    .join(', ');\n  userParts.push(`Featured services to visualise: ${services}`);\n}\nif (item.hasReference) {\n  userParts.push('A reference image will be supplied as the starting frame / subject. Keep that subject consistent.');\n}\nuserParts.push('Important: keep the scene object-focused / food-focused, free from people, faces, hands, body parts.');\n\nreturn [{\n  json: {\n    original: item,\n    api_body: {\n      model: 'google/gemini-2.5-flash',\n      messages: [\n        { role: 'system', content: systemPrompt },\n        { role: 'user', content: userParts.join('\\n') }\n      ],\n      temperature: 0.7,\n      max_tokens: 400,\n    },\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        112,
-        640
-      ],
-      "id": "99011c62-ffa8-4642-94c8-0cf4c064f57d",
+      "position": [-560, 480],
+      "id": "node-prep-vid-prompt",
       "name": "Prepare Video Prompt"
     },
     {
@@ -363,127 +299,56 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.api_body) }}",
-        "options": {
-          "timeout": 60000
-        }
+        "options": { "timeout": 60000 }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        336,
-        640
-      ],
-      "id": "ce190767-3655-40e2-9b3f-5c563c640a9a",
+      "position": [-320, 480],
+      "id": "node-enhance-vid",
       "name": "Enhance Video Prompt (Gemini)",
       "retryOnFail": true,
       "maxTries": 5,
       "waitBetweenTries": 5000,
       "credentials": {
-        "googleOAuth2Api": {
-          "id": "l4X9AcceC8Sg790W",
-          "name": "Google account"
-        }
+        "googleOAuth2Api": { "id": "GOOGLE_OAUTH_PLACEHOLDER", "name": "Google account" }
       }
     },
     {
       "parameters": {
-        "jsCode": "const runIndex = $('Loop Scenes').context.currentRunIndex || 0;\nlet delaySeconds = 0;\nif (runIndex > 0) {\n  try {\n    const lastExtract = $('Extract Task Info').first(0, runIndex - 1);\n    if (lastExtract && lastExtract.json) {\n      const lastSubmittedAt = new Date(lastExtract.json.submitted_at).getTime();\n      const now = Date.now();\n      const elapsedMs = now - lastSubmittedAt;\n      const requiredMs = 65 * 1000; // 65 seconds to be safe\n      if (elapsedMs < requiredMs) {\n        delaySeconds = Math.ceil((requiredMs - elapsedMs) / 1000);\n      }\n    }\n  } catch (e) {\n    // fallback\n  }\n}\nreturn [{ \n  json: {\n    ...$input.first().json,\n    delay_seconds: delaySeconds,\n    should_wait: delaySeconds > 0\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        560,
-        832
-      ],
-      "id": "ba4ff43c-3a19-493f-ac4f-50ee81aafba7",
-      "name": "Calculate Rate Limit Delay"
-    },
-    {
-      "parameters": {
         "conditions": {
           "boolean": [
-            {
-              "value1": "={{ $json.should_wait }}",
-              "value2": true
-            }
+            { "value1": "={{ $('Validate Input').first().json.hasReference }}", "value2": true }
           ]
         }
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [
-        784,
-        832
-      ],
-      "id": "6f7abb64-6913-4430-aca3-ed38e943c270",
-      "name": "Should Delay?"
-    },
-    {
-      "parameters": {
-        "amount": "={{ $json.delay_seconds }}"
-      },
-      "type": "n8n-nodes-base.wait",
-      "typeVersion": 1.1,
-      "position": [
-        992,
-        976
-      ],
-      "id": "9b98002d-18d0-4d08-b4b3-53ac26fdad27",
-      "name": "Rate Limit Wait",
-      "webhookId": "c5691ce4-21b8-4189-b430-666eaf73935d"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "boolean": [
-            {
-              "value1": "={{ $('Prepare Video Prompt').first().json.original.has_reference }}",
-              "value2": true
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 1,
-      "position": [
-        560,
-        640
-      ],
-      "id": "84076a3a-b3f1-497e-9429-da7f14cdf785",
+      "position": [-80, 480],
+      "id": "node-has-ref-vid",
       "name": "Has Ref Video?"
     },
     {
       "parameters": {
-        "url": "={{ $('Prepare Video Prompt').first().json.original.reference_image_urls[0] }}",
+        "url": "={{ $('Validate Input').first().json.referenceImageUrls[0] }}",
         "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file"
-            }
-          },
+          "response": { "response": { "responseFormat": "file" } },
           "timeout": 30000
         }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        784,
-        512
-      ],
-      "id": "8993e357-d488-49c0-b4d8-5a3517116447",
+      "position": [160, 320],
+      "id": "node-download-vid-ref",
       "name": "Download Video Ref"
     },
     {
       "parameters": {
-        "jsCode": "// Build the Veo 3.1 predictLongRunning request body (text-to-video or image-to-video).\nconst originalData = $('Prepare Video Prompt').first().json.original;\nconst gptResponse = $('Enhance Video Prompt (Gemini)').first().json;\nconst enhancedPrompt = gptResponse.choices[0].message.content.trim();\n\nlet imageBase64 = null;\nlet mimeType = 'image/jpeg';\ntry {\n  const bin = $input.first().binary && $input.first().binary.data;\n  if (bin && bin.data) {\n    imageBase64 = bin.data;\n    mimeType = bin.mimeType || 'image/jpeg';\n  }\n} catch (e) {\n  // no reference image\n}\n\nconst aspectRatio = originalData.aspect_ratio === '16:9' ? '16:9' : '9:16';\n\n// Check if this is a video extension based on loop index\nconst runIndex = $('Loop Scenes').context.currentRunIndex || 0;\nconst isExtension = runIndex > 0;\nlet previousVideoGcsUri = null;\nif (isExtension) {\n  try {\n    const allRuns = $('Evaluate Video Status').all();\n    if (allRuns && allRuns.length > 0) {\n      previousVideoGcsUri = allRuns[allRuns.length - 1].json.gcs_url;\n    }\n  } catch (e) {\n    // fallback\n  }\n}\n\nconst instance = { prompt: enhancedPrompt };\nif (isExtension && previousVideoGcsUri) {\n  instance.video = {\n    gcsUri: previousVideoGcsUri,\n    mimeType: 'video/mp4'\n  };\n} else if (imageBase64) {\n  instance.image = {\n    bytesBase64Encoded: imageBase64,\n    mimeType: mimeType\n  };\n}\n\n// Vertex AI Veo 3.1 video extension only supports exactly 7 seconds length for extension segments\nconst duration = isExtension ? 7 : 8;\n\nconst parameters = {\n  storageUri: 'gs://' + ($env.GCP_VEO_OUTPUT_BUCKET || 'your-bucket-name') + '/veo/',\n  sampleCount: 1,\n  aspectRatio: aspectRatio,\n  resolution: '720p',\n  durationSeconds: duration\n};\nif (originalData.negative_prompt) {\n  parameters.negativePrompt = originalData.negative_prompt;\n}\n\nreturn [{\n  json: {\n    original: originalData,\n    enhanced_prompt: enhancedPrompt,\n    is_extension: isExtension,\n    reference_video_url: previousVideoGcsUri,\n    api_body: {\n      instances: [instance],\n      parameters: parameters\n    },\n    submitted_at: new Date().toISOString()\n  }\n}];"
+        "jsCode": "const original = $('Validate Input').first().json;\nconst promptResp = $('Enhance Video Prompt (Gemini)').first().json;\nconst enhancedPrompt = promptResp.choices[0].message.content.trim();\n\nlet imageBase64 = null;\nlet mimeType = 'image/jpeg';\ntry {\n  const bin = $input.first().binary && $input.first().binary.data;\n  if (bin && bin.data) {\n    imageBase64 = bin.data;\n    mimeType = bin.mimeType || 'image/jpeg';\n  }\n} catch (e) {}\n\nconst instance = { prompt: enhancedPrompt };\nif (imageBase64) {\n  instance.image = { bytesBase64Encoded: imageBase64, mimeType };\n}\n\nconst parameters = {\n  storageUri: 'gs://' + ($env.GCP_VEO_OUTPUT_BUCKET || 'erp-ai-veo-bucket') + '/n8n-tmp/',\n  sampleCount: 1,\n  aspectRatio: '9:16',\n  resolution: '720p',\n  durationSeconds: 8,\n};\n\nreturn [{\n  json: {\n    original,\n    enhanced_prompt: enhancedPrompt,\n    submitted_at: new Date().toISOString(),\n    api_body: { instances: [instance], parameters },\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        992,
-        640
-      ],
-      "id": "cfa71bba-6c7b-4e0a-ab22-9c55ba22940e",
+      "position": [400, 480],
+      "id": "node-build-vid",
       "name": "Build Video Job"
     },
     {
@@ -495,36 +360,25 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.api_body) }}",
-        "options": {
-          "timeout": 300000
-        }
+        "options": { "timeout": 300000 }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1216,
-        640
-      ],
-      "id": "6971e14d-516e-4648-9394-aac8fc64bfdc",
+      "position": [640, 480],
+      "id": "node-submit-vid",
       "name": "Submit Video Job (Veo 3.1)",
       "credentials": {
-        "googleOAuth2Api": {
-          "id": "l4X9AcceC8Sg790W",
-          "name": "Google account"
-        }
+        "googleOAuth2Api": { "id": "GOOGLE_OAUTH_PLACEHOLDER", "name": "Google account" }
       }
     },
     {
       "parameters": {
-        "jsCode": "const submitResponse = $input.first().json;\nconst jobData = $('Build Video Job').item.json;\n\nconst taskId = submitResponse.name;\nif (!taskId) {\n  throw new Error('Failed to get operation name from Veo API. Response: ' + JSON.stringify(submitResponse).slice(0, 1000));\n}\n\nconst original = jobData?.original || {};\nconst campaignId = original.metadata?.campaign_id || 'gen';\n\nreturn [{\n  json: {\n    task_id: taskId,\n    original: original,\n    enhanced_prompt: jobData?.enhanced_prompt || '',\n    submitted_at: jobData?.submitted_at || new Date().toISOString(),\n    filename: `vid_${campaignId}_${Date.now()}.mp4`\n  }\n}];"
+        "jsCode": "const submitResponse = $input.first().json;\nconst jobData = $('Build Video Job').item.json;\nconst taskId = submitResponse.name;\nif (!taskId) {\n  throw new Error('Veo did not return an operation name. Response: ' + JSON.stringify(submitResponse).slice(0, 1000));\n}\nreturn [{\n  json: {\n    task_id: taskId,\n    original: jobData.original,\n    enhanced_prompt: jobData.enhanced_prompt,\n    submitted_at: jobData.submitted_at || new Date().toISOString(),\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        1440,
-        640
-      ],
-      "id": "4ef53b2f-2ec6-4b56-8075-329927f1929c",
+      "position": [880, 480],
+      "id": "node-extract-task",
       "name": "Extract Task Info"
     },
     {
@@ -533,13 +387,10 @@
       },
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [
-        1664,
-        640
-      ],
-      "id": "79c5c75a-3891-493d-aa9a-284f2bdad236",
+      "position": [1120, 480],
+      "id": "node-wait-20s",
       "name": "Wait 20s",
-      "webhookId": "9b444048-201d-4dca-bf1e-2e03755cb42e"
+      "webhookId": "vid-poll-wait-001"
     },
     {
       "parameters": {
@@ -549,37 +400,26 @@
         "nodeCredentialType": "googleOAuth2Api",
         "sendBody": true,
         "specifyBody": "json",
-        "jsonBody": "={\"operationName\":\"{{ $('Extract Task Info').item.json.task_id }}\"}",
-        "options": {
-          "timeout": 15000
-        }
+        "jsonBody": "={\"operationName\":\"{{ $json.task_id }}\"}",
+        "options": { "timeout": 15000 }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        1872,
-        640
-      ],
-      "id": "8490c16b-8846-4cd7-a21c-231ad54cbe69",
+      "position": [1360, 480],
+      "id": "node-check-vid",
       "name": "Check Video Status",
       "credentials": {
-        "googleOAuth2Api": {
-          "id": "l4X9AcceC8Sg790W",
-          "name": "Google account"
-        }
+        "googleOAuth2Api": { "id": "GOOGLE_OAUTH_PLACEHOLDER", "name": "Google account" }
       }
     },
     {
       "parameters": {
-        "jsCode": "// Evaluate the Veo operation status and normalize it for routing.\nconst statusResponse = $input.first().json;\nconst taskInfo = $('Extract Task Info').item.json;\n\nconst elapsed = Date.now() - new Date(taskInfo.submitted_at).getTime();\nconst maxDuration = 10 * 60 * 1000;\n\nif (elapsed > maxDuration) {\n  return [{\n    json: {\n      status: 'failed',\n      error_message: `Video generation timed out after ${Math.round(elapsed / 1000)}s`,\n      task_id: taskInfo.task_id,\n      original: taskInfo.original,\n      elapsed_ms: elapsed\n    }\n  }];\n}\n\nconst isDone = statusResponse.done === true;\nlet videoUrl = null;\nlet errorMsg = null;\n\n// Support both official Vertex AI schema (response.videos[0].gcsUri) and AI Studio schema\nconst rawUri = isDone ? (statusResponse.response?.videos?.[0]?.gcsUri || statusResponse.response?.generateVideoResponse?.generatedSamples?.[0]?.video?.uri) : null;\n\nif (isDone) {\n  const apiError = statusResponse.error || statusResponse.response?.error;\n  if (apiError) {\n    errorMsg = apiError.message || JSON.stringify(apiError);\n  } else if (!rawUri) {\n    errorMsg = 'Could not find video URI in finished response: ' + JSON.stringify(statusResponse).slice(0, 1000);\n  } else {\n    try {\n      const match = rawUri.match(/^gs:\\/\\/([^\\/]+)\\/(.+)$/);\n      if (match) {\n        const bucket = match[1];\n        const object = encodeURIComponent(match[2]);\n        videoUrl = `https://storage.googleapis.com/download/storage/v1/b/${bucket}/o/${object}?alt=media`;\n      } else {\n        videoUrl = rawUri;\n      }\n    } catch (e) {\n      errorMsg = 'Error parsing GCS URI: ' + e.message;\n    }\n  }\n}\n\nlet normalizedStatus = 'processing';\nif (isDone) {\n  normalizedStatus = errorMsg ? 'failed' : 'completed';\n}\n\nreturn [{\n  json: {\n    status: normalizedStatus,\n    video_url: videoUrl,\n    gcs_url: rawUri,\n    task_id: taskInfo.task_id,\n    original: taskInfo.original,\n    enhanced_prompt: taskInfo.enhanced_prompt,\n    filename: taskInfo.filename,\n    submitted_at: taskInfo.submitted_at,\n    elapsed_ms: elapsed,\n    error_message: errorMsg\n  }\n}];"
+        "jsCode": "const statusResponse = $input.first().json;\nconst taskInfo = $('Extract Task Info').first().json;\n\nconst elapsed = Date.now() - new Date(taskInfo.submitted_at).getTime();\nconst maxDuration = 10 * 60 * 1000;\n\nif (elapsed > maxDuration) {\n  return [{\n    json: {\n      status: 'failed',\n      error_message: 'Video generation timed out after ' + Math.round(elapsed / 1000) + 's',\n      task_id: taskInfo.task_id,\n      original: taskInfo.original,\n    }\n  }];\n}\n\nconst isDone = statusResponse.done === true;\nlet gcsUri = null;\nlet errorMsg = null;\nlet width = null, height = null, durationSec = null;\n\nif (isDone) {\n  const apiError = statusResponse.error || (statusResponse.response && statusResponse.response.error);\n  if (apiError) {\n    errorMsg = apiError.message || JSON.stringify(apiError);\n  } else {\n    gcsUri = (statusResponse.response && statusResponse.response.videos && statusResponse.response.videos[0] && statusResponse.response.videos[0].gcsUri)\n      || (statusResponse.response && statusResponse.response.generateVideoResponse && statusResponse.response.generateVideoResponse.generatedSamples && statusResponse.response.generateVideoResponse.generatedSamples[0] && statusResponse.response.generateVideoResponse.generatedSamples[0].video && statusResponse.response.generateVideoResponse.generatedSamples[0].video.uri)\n      || null;\n    if (!gcsUri) {\n      errorMsg = 'Could not find video URI: ' + JSON.stringify(statusResponse).slice(0, 800);\n    } else {\n      const meta = (statusResponse.response && statusResponse.response.videos && statusResponse.response.videos[0]) || (statusResponse.response && statusResponse.response.generateVideoResponse && statusResponse.response.generateVideoResponse.generatedSamples && statusResponse.response.generateVideoResponse.generatedSamples[0]);\n      width = (meta && meta.width) || null;\n      height = (meta && meta.height) || null;\n      durationSec = (meta && (meta.durationSeconds || meta.durationSec)) || 8;\n    }\n  }\n}\n\nlet normalizedStatus = 'processing';\nif (isDone) {\n  normalizedStatus = errorMsg ? 'failed' : 'completed';\n}\n\nreturn [{\n  json: {\n    status: normalizedStatus,\n    gcs_url: gcsUri,\n    error_message: errorMsg,\n    task_id: taskInfo.task_id,\n    original: taskInfo.original,\n    enhanced_prompt: taskInfo.enhanced_prompt,\n    width, height, durationSec,\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        2096,
-        640
-      ],
-      "id": "f1b8f0bd-7568-444a-ba71-a962fbf2887e",
+      "position": [1600, 480],
+      "id": "node-eval-vid",
       "name": "Evaluate Video Status"
     },
     {
@@ -588,696 +428,278 @@
           "values": [
             {
               "conditions": {
-                "options": {
-                  "caseSensitive": true
-                },
+                "options": { "caseSensitive": true },
                 "conditions": [
-                  {
-                    "id": "cond-completed",
-                    "leftValue": "={{ $json.status }}",
-                    "rightValue": "completed",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
+                  { "id": "cond-completed", "leftValue": "={{ $json.status }}", "rightValue": "completed", "operator": { "type": "string", "operation": "equals" } }
                 ],
                 "combinator": "and"
               },
               "renameOutput": true,
-              "outputKey": "Completed"
+              "outputKey": "completed"
             },
             {
               "conditions": {
-                "options": {
-                  "caseSensitive": true
-                },
+                "options": { "caseSensitive": true },
                 "conditions": [
-                  {
-                    "id": "cond-processing",
-                    "leftValue": "={{ $json.status }}",
-                    "rightValue": "processing",
-                    "operator": {
-                      "type": "string",
-                      "operation": "equals"
-                    }
-                  }
+                  { "id": "cond-processing", "leftValue": "={{ $json.status }}", "rightValue": "processing", "operator": { "type": "string", "operation": "equals" } }
                 ],
                 "combinator": "and"
               },
               "renameOutput": true,
-              "outputKey": "Processing"
+              "outputKey": "processing"
             }
           ]
         },
-        "options": {
-          "fallbackOutput": "extra"
-        }
+        "options": { "fallbackOutput": "extra" }
       },
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [
-        2320,
-        640
-      ],
-      "id": "7f9de01d-18b7-4486-87e1-20c7d04cf812",
+      "position": [1840, 480],
+      "id": "node-route-vid",
       "name": "Route Video Status"
     },
     {
       "parameters": {
-        "url": "={{ $json.video_url || $('Evaluate Video Status').last().json.video_url }}",
+        "url": "={{ $json.gcs_url || $('Evaluate Video Status').last().json.gcs_url }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "googleOAuth2Api",
         "options": {
-          "response": {
-            "response": {
-              "responseFormat": "file"
-            }
-          },
-          "timeout": 120000
+          "response": { "response": { "responseFormat": "file" } },
+          "timeout": 180000
         }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        112,
-        256
-      ],
-      "id": "b4e0cc89-9a63-454c-8d61-0a5b216a2c4a",
-      "name": "Download Video",
+      "position": [2080, 480],
+      "id": "node-download-vid",
+      "name": "Download Video (GCS)",
       "credentials": {
-        "googleOAuth2Api": {
-          "id": "l4X9AcceC8Sg790W",
-          "name": "Google account"
-        }
+        "googleOAuth2Api": { "id": "GOOGLE_OAUTH_PLACEHOLDER", "name": "Google account" }
       }
     },
     {
       "parameters": {
-        "authentication": "serviceAccount",
-        "name": "={{ $json.filename || $('Evaluate Video Status').last().json.filename || 'generated-video.mp4' }}",
-        "driveId": {
-          "__rl": true,
-          "mode": "list",
-          "value": "My Drive",
-          "cachedResultName": "My Drive"
-        },
-        "folderId": {
-          "__rl": true,
-          "mode": "id",
-          "value": "=YOUR_GOOGLE_DRIVE_FOLDER_ID"
-        },
-        "options": {}
-      },
-      "type": "n8n-nodes-base.googleDrive",
-      "typeVersion": 3,
-      "position": [
-        336,
-        256
-      ],
-      "id": "2d6a2327-c16d-410d-b214-7aba3117a461",
-      "name": "Upload Video",
-      "credentials": {
-        "googleApi": {
-          "id": "wt5Jm7glqfIXBKd3",
-          "name": "Google Service Account account"
-        }
-      }
-    },
-    {
-      "parameters": {
-        "jsCode": "const data = $input.first().json;\n\nreturn [{\n  json: {\n    success: false,\n    content_type: 'short_video',\n    error: {\n      code: 'VIDEO_GENERATION_FAILED',\n      message: data.error_message || 'Video generation failed.',\n      task_id: data.task_id,\n      elapsed_ms: data.elapsed_ms,\n      scene_prompt: data.original?.prompt || data.original?.scene_prompt || null,\n      scene_index: data.original?.scene_index || null\n    },\n    metadata: {\n      ...(data.original?.metadata || {}),\n      task_id: data.task_id,\n      scene_prompt: data.original?.prompt || data.original?.scene_prompt || null,\n      scene_index: data.original?.scene_index || null\n    }\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        2560,
-        800
-      ],
-      "id": "41c82a74-9e17-4dcc-b914-7e48f2fa6d29",
-      "name": "Handle Video Error"
-    },
-    {
-      "parameters": {
-        "jsCode": "const item = $input.first().json;\n\nreturn [{\n  json: {\n    success: false,\n    content_type: item.content_type || 'unknown',\n    error: {\n      code: 'VALIDATION_ERROR',\n      message: `Unsupported content_type: '${item.content_type}'. Use 'image' or 'short_video'.`\n    },\n    metadata: {\n      execution_id: $execution.id\n    }\n  }\n}];"
-      },
-      "type": "n8n-nodes-base.code",
-      "typeVersion": 2,
-      "position": [
-        -512,
-        992
-      ],
-      "id": "5cb6656f-70e9-4f46-970b-65319215696f",
-      "name": "Format Validation Error"
-    },
-    {
-      "parameters": {
-        "respondWith": "allIncomingItems",
+        "method": "PUT",
+        "url": "={{ $('Validate Input').first().json.upload.presignedUrl }}",
+        "sendBody": true,
+        "specifyBody": "binary",
+        "binaryPropertyName": "data",
         "options": {
-          "responseCode": 200
+          "response": { "response": { "responseFormat": "string" } },
+          "timeout": 180000
         }
       },
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        3344,
-        336
-      ],
-      "id": "bf14bbd6-8179-4cda-bc36-0247d066f53f",
-      "name": "Respond - Success"
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2320, 480],
+      "id": "node-upload-vid-minio",
+      "name": "PUT Video to MinIO"
     },
     {
       "parameters": {
-        "respondWith": "allIncomingItems",
-        "options": {
-          "responseCode": 422
-        }
-      },
-      "type": "n8n-nodes-base.respondToWebhook",
-      "typeVersion": 1.1,
-      "position": [
-        3344,
-        896
-      ],
-      "id": "4fc5e69e-96a2-4bb1-bc8b-0fdcfb1541a5",
-      "name": "Respond - Error"
-    },
-    {
-      "parameters": {
-        "jsCode": "const scenesMetadata = $('Evaluate Video Status').all().map((item, index) => {\n  const data = item.json;\n  return {\n    scene_index: index,\n    prompt_used: data.enhanced_prompt,\n    gcs_url: data.gcs_url,\n    elapsed_ms: data.elapsed_ms,\n    task_id: data.task_id\n  };\n});\nconst uploadResult = $('Upload Video').first().json;\nconst originalInput = $('Validate Input').first().json;\n\nconst finalAsset = {\n  url: uploadResult.webViewLink || uploadResult.webContentLink || uploadResult.id,\n  drive_file_id: uploadResult.id,\n  name: uploadResult.name || scenesMetadata[scenesMetadata.length - 1].name,\n  mime_type: uploadResult.mimeType || 'video/mp4',\n  size_bytes: parseInt(uploadResult.size) || null,\n  gcs_url: scenesMetadata[scenesMetadata.length - 1].gcs_url\n};\n\nreturn [{\n  json: {\n    callback_url: originalInput.callback_url,\n    payload: {\n      success: true,\n      execution_id: originalInput.metadata.execution_id,\n      content_type: 'short_video',\n      total_scenes: scenesMetadata.length,\n      final_asset: finalAsset,\n      scenes_metadata: scenesMetadata\n    }\n  }\n}];"
+        "jsCode": "const evalData = $('Evaluate Video Status').last().json;\nconst putResp = $('PUT Video to MinIO').first();\nconst status = putResp.statusCode || 0;\nif (!(status >= 200 && status < 300)) {\n  throw new Error('MinIO PUT for video returned status ' + status + ': ' + (putResp.body || '').toString().slice(0, 300));\n}\n\nconst upload = evalData.original.upload;\nconst payload = {\n  jobId: evalData.original.jobId,\n  result: {\n    storageKey: upload.storageKey,\n    publicUrl: upload.publicUrl,\n    mime: 'video/mp4',\n    sizeBytes: null,\n    width: evalData.width,\n    height: evalData.height,\n    durationSec: evalData.durationSec,\n  },\n};\n\nreturn [{\n  json: {\n    callbackUrl: evalData.original.callbackUrl,\n    payload,\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [
-        560,
-        256
-      ],
-      "id": "3bd28043-f7b3-48ff-8c54-265edf74019e",
-      "name": "Prepare Callback"
-    },
-    {
-      "parameters": {
-        "conditions": {
-          "boolean": [
-            {
-              "value1": "={{ !!$json.callback_url }}",
-              "value2": true
-            }
-          ]
-        }
-      },
-      "type": "n8n-nodes-base.if",
-      "typeVersion": 1,
-      "position": [
-        784,
-        256
-      ],
-      "id": "007d8b94-fa83-4098-8e6c-9b27bb0379f4",
-      "name": "Has Callback?"
+      "position": [2560, 480],
+      "id": "node-prepare-vid-cb",
+      "name": "Prepare Video Callback"
     },
     {
       "parameters": {
         "method": "POST",
-        "url": "={{ $json.callback_url }}",
+        "url": "={{ $json.callbackUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_API_KEY }}", "parameterType": "string" }
+          ]
+        },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.payload) }}",
-        "options": {}
+        "options": { "timeout": 30000 }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [
-        992,
-        176
-      ],
-      "id": "a9a0b18d-e3c5-4690-af63-71252855dc97",
-      "name": "Send Callback"
+      "position": [2800, 480],
+      "id": "node-send-vid-cb",
+      "name": "Send Video Callback",
+      "credentials": {
+        "httpHeaderAuth": { "id": "INTERNAL_TOKEN_CRED", "name": "Internal Token (X-Internal-Token)" }
+      }
+    },
+    {
+      "parameters": {
+        "respondWith": "json",
+        "responseBody": "={\n  \"status\": \"accepted\",\n  \"jobId\": \"{{ $('Validate Input').first().json.jobId }}\",\n  \"message\": \"Short-video generation in progress. Result will be POSTed to callbackUrl.\"\n}",
+        "options": { "responseCode": 202 }
+      },
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [400, 720],
+      "id": "node-ack-vid",
+      "name": "Acknowledge Video (202)"
+    },
+    {
+      "parameters": {
+        "jsCode": "const data = $input.first().json;\nlet jobId = null;\nlet callbackUrl = null;\ntry { jobId = $('Validate Input').first().json.jobId; } catch (e) {}\ntry { callbackUrl = $('Validate Input').first().json.callbackUrl; } catch (e) {}\n\nconst errPayload = {\n  jobId: jobId,\n  error: {\n    code: 'VIDEO_GENERATION_FAILED',\n    message: data.error_message || 'Video generation failed.',\n    taskId: data.task_id || null,\n  },\n};\n\nreturn [{\n  json: {\n    callbackUrl: callbackUrl,\n    payload: errPayload,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [2080, 720],
+      "id": "node-vid-err",
+      "name": "Format Video Error"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.callbackUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_API_KEY }}", "parameterType": "string" }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": { "timeout": 30000 }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [2320, 720],
+      "id": "node-send-vid-err",
+      "name": "Send Video Error",
+      "credentials": {
+        "httpHeaderAuth": { "id": "INTERNAL_TOKEN_CRED", "name": "Internal Token (X-Internal-Token)" }
+      }
     }
   ],
   "pinData": {},
   "connections": {
-    "Webhook - Content Request": {
-      "main": [
-        [
-          {
-            "node": "Validate Input",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Webhook - Media Request": {
+      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
     },
     "Validate Input": {
       "main": [
-        [
-          {
-            "node": "Route by Content Type",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Route by Type", "type": "main", "index": 0 }],
+        [{ "node": "Send Validation Error Callback", "type": "main", "index": 0 }]
       ]
     },
-    "Route by Content Type": {
+    "Send Validation Error Callback": {
+      "main": [[{ "node": "Ack Validation Error (400)", "type": "main", "index": 0 }]]
+    },
+    "Route by Type": {
       "main": [
-        [
-          {
-            "node": "Prepare Image Prompt",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Respond to Webhook - Async",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Format Validation Error",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Prepare Image Prompt", "type": "main", "index": 0 }],
+        [{ "node": "Prepare Video Prompt", "type": "main", "index": 0 }],
+        [{ "node": "Send Validation Error Callback", "type": "main", "index": 0 }]
       ]
     },
     "Prepare Image Prompt": {
-      "main": [
-        [
-          {
-            "node": "Enhance Image Prompt (Gemini)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Enhance Image Prompt (Gemini)", "type": "main", "index": 0 }]]
     },
     "Enhance Image Prompt (Gemini)": {
-      "main": [
-        [
-          {
-            "node": "Has Ref Image?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Has Ref Image?", "type": "main", "index": 0 }]]
     },
     "Has Ref Image?": {
       "main": [
-        [
-          {
-            "node": "Split Ref Urls",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Build Image Request",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Split Refs", "type": "main", "index": 0 }],
+        [{ "node": "Build Image Request", "type": "main", "index": 0 }]
       ]
     },
-    "Split Ref Urls": {
-      "main": [
-        [
-          {
-            "node": "Download Image Refs",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Split Refs": {
+      "main": [[{ "node": "Download Refs", "type": "main", "index": 0 }]]
     },
-    "Download Image Refs": {
-      "main": [
-        [
-          {
-            "node": "Build Image Request",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Download Refs": {
+      "main": [[{ "node": "Build Image Request", "type": "main", "index": 0 }]]
     },
     "Build Image Request": {
-      "main": [
-        [
-          {
-            "node": "Generate Image (Nano Banana)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Generate Image (Nano Banana)", "type": "main", "index": 0 }]]
     },
     "Generate Image (Nano Banana)": {
-      "main": [
-        [
-          {
-            "node": "Convert Image to Binary",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Convert Image to Binary", "type": "main", "index": 0 }]]
     },
     "Convert Image to Binary": {
-      "main": [
-        [
-          {
-            "node": "Upload Image",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "PUT Image to MinIO", "type": "main", "index": 0 }]]
     },
-    "Upload Image": {
-      "main": [
-        [
-          {
-            "node": "Format Image Response",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "PUT Image to MinIO": {
+      "main": [[{ "node": "Prepare Image Callback", "type": "main", "index": 0 }]]
     },
-    "Format Image Response": {
-      "main": [
-        [
-          {
-            "node": "Respond - Success",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Prepare Image Callback": {
+      "main": [[{ "node": "Has Callback?", "type": "main", "index": 0 }]]
     },
-    "Respond to Webhook - Async": {
-      "main": [
-        [
-          {
-            "node": "Split Scenes",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Has Callback?": {
+      "main": [[{ "node": "Send Image Callback", "type": "main", "index": 0 }]]
     },
-    "Split Scenes": {
-      "main": [
-        [
-          {
-            "node": "Loop Scenes",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Loop Scenes": {
-      "main": [
-        [
-          {
-            "node": "Download Video",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Prepare Video Prompt",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Send Image Callback": {
+      "main": [[{ "node": "Acknowledge Image (202)", "type": "main", "index": 0 }]]
     },
     "Prepare Video Prompt": {
-      "main": [
-        [
-          {
-            "node": "Enhance Video Prompt (Gemini)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Enhance Video Prompt (Gemini)", "type": "main", "index": 0 }]]
     },
     "Enhance Video Prompt (Gemini)": {
-      "main": [
-        [
-          {
-            "node": "Calculate Rate Limit Delay",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Calculate Rate Limit Delay": {
-      "main": [
-        [
-          {
-            "node": "Should Delay?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Should Delay?": {
-      "main": [
-        [
-          {
-            "node": "Rate Limit Wait",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Has Ref Video?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Rate Limit Wait": {
-      "main": [
-        [
-          {
-            "node": "Has Ref Video?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Has Ref Video?", "type": "main", "index": 0 }]]
     },
     "Has Ref Video?": {
       "main": [
-        [
-          {
-            "node": "Download Video Ref",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Build Video Job",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Download Video Ref", "type": "main", "index": 0 }],
+        [{ "node": "Build Video Job", "type": "main", "index": 0 }]
       ]
     },
     "Download Video Ref": {
-      "main": [
-        [
-          {
-            "node": "Build Video Job",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Build Video Job", "type": "main", "index": 0 }]]
     },
     "Build Video Job": {
-      "main": [
-        [
-          {
-            "node": "Submit Video Job (Veo 3.1)",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Submit Video Job (Veo 3.1)", "type": "main", "index": 0 }]]
     },
     "Submit Video Job (Veo 3.1)": {
-      "main": [
-        [
-          {
-            "node": "Extract Task Info",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Extract Task Info", "type": "main", "index": 0 }]]
     },
     "Extract Task Info": {
-      "main": [
-        [
-          {
-            "node": "Wait 20s",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Wait 20s", "type": "main", "index": 0 }]]
     },
     "Wait 20s": {
-      "main": [
-        [
-          {
-            "node": "Check Video Status",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Check Video Status", "type": "main", "index": 0 }]]
     },
     "Check Video Status": {
-      "main": [
-        [
-          {
-            "node": "Evaluate Video Status",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Evaluate Video Status", "type": "main", "index": 0 }]]
     },
     "Evaluate Video Status": {
-      "main": [
-        [
-          {
-            "node": "Route Video Status",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+      "main": [[{ "node": "Route Video Status", "type": "main", "index": 0 }]]
     },
     "Route Video Status": {
       "main": [
-        [
-          {
-            "node": "Loop Scenes",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Wait 20s",
-            "type": "main",
-            "index": 0
-          }
-        ],
-        [
-          {
-            "node": "Handle Video Error",
-            "type": "main",
-            "index": 0
-          }
-        ]
+        [{ "node": "Download Video (GCS)", "type": "main", "index": 0 }],
+        [{ "node": "Wait 20s", "type": "main", "index": 0 }],
+        [{ "node": "Format Video Error", "type": "main", "index": 0 }]
       ]
     },
-    "Download Video": {
-      "main": [
-        [
-          {
-            "node": "Upload Video",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Download Video (GCS)": {
+      "main": [[{ "node": "PUT Video to MinIO", "type": "main", "index": 0 }]]
     },
-    "Upload Video": {
-      "main": [
-        [
-          {
-            "node": "Prepare Callback",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "PUT Video to MinIO": {
+      "main": [[{ "node": "Prepare Video Callback", "type": "main", "index": 0 }]]
     },
-    "Handle Video Error": {
-      "main": [
-        [
-          {
-            "node": "Respond - Error",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Prepare Video Callback": {
+      "main": [[{ "node": "Send Video Callback", "type": "main", "index": 0 }]]
     },
-    "Format Validation Error": {
-      "main": [
-        [
-          {
-            "node": "Respond - Error",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Send Video Callback": {
+      "main": [[{ "node": "Acknowledge Video (202)", "type": "main", "index": 0 }]]
     },
-    "Prepare Callback": {
-      "main": [
-        [
-          {
-            "node": "Has Callback?",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
-    },
-    "Has Callback?": {
-      "main": [
-        [
-          {
-            "node": "Send Callback",
-            "type": "main",
-            "index": 0
-          }
-        ]
-      ]
+    "Format Video Error": {
+      "main": [[{ "node": "Send Video Error", "type": "main", "index": 0 }]]
     }
   },
-  "active": false,
+  "active": true,
   "settings": {
     "executionOrder": "v1"
   },
-  "versionId": "39b2e576-2782-4be2-b3ba-849eee2b8922",
+  "staticData": null,
+  "tags": [],
   "meta": {
-    "templateCredsSetupCompleted": true,
-    "instanceId": "5e30213775d3fca4ca52244904af74302b6a324ce6ca36fffddb60668ea14c98"
+    "templateCredsSetupCompleted": false
   },
-  "id": "SDZXoaCeuJ7fRctz",
-  "tags": []
+  "id": "ai-media-n8n-v1"
 }

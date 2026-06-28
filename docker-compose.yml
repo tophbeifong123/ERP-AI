@@ -21,6 +21,10 @@ services:
       - GCP_PROJECT_ID=${GCP_PROJECT_ID}
       - GCP_LOCATION=${GCP_LOCATION}
       - GCP_VEO_OUTPUT_BUCKET=${GCP_VEO_OUTPUT_BUCKET}
+      # Shared with the NestJS backend so the media callback from n8n is accepted
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-dev-internal-api-key}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     volumes:
       - ./n8n_data:/home/node/.n8n
       
