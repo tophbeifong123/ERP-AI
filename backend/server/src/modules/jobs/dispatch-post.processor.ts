@@ -4,7 +4,7 @@ import { ConfigService } from '@nestjs/config';
 import { Job } from 'bullmq';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import { Post, PostStatus } from '../../database/entities/post.entity';
+import { Post } from '../../database/entities/post.entity';
 import { PostMedia } from '../../database/entities/post-media.entity';
 import { FacebookPage } from '../../database/entities/facebook-page.entity';
 import { File } from '../../database/entities/file.entity';
@@ -55,7 +55,9 @@ export class DispatchPostProcessor extends WorkerHost {
       throw new Error(`Post ${postId} has no fbPageId`);
     }
 
-    const page = await this.pageRepo.findOne({ where: { id: post.fbPageId, deletedAt: IsNull() } });
+    const page = await this.pageRepo.findOne({
+      where: { id: post.fbPageId, deletedAt: IsNull() },
+    });
     if (!page) {
       throw new Error(`Facebook page ${post.fbPageId} not found`);
     }
@@ -113,13 +115,17 @@ export class DispatchPostProcessor extends WorkerHost {
       });
       const data = (await res.json()) as { id?: string } & FbErrorBody;
       if (!res.ok || !data.id) {
-        const msg = data.error?.message ?? `Facebook API returned ${res.status}`;
+        const msg =
+          data.error?.message ?? `Facebook API returned ${res.status}`;
         const code = data.error?.code ? `E${data.error.code}` : 'E_FB';
         post.status = 'failed';
         post.errorCode = code;
         post.errorMessage = msg;
         await this.postRepo.save(post);
-        await this.postEvents.emitForStatus(post.id, 'failed', { errorCode: code, errorMessage: msg });
+        await this.postEvents.emitForStatus(post.id, 'failed', {
+          errorCode: code,
+          errorMessage: msg,
+        });
         throw new Error(msg);
       }
 

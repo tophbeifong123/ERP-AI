@@ -57,7 +57,12 @@ const queueFactory = (config: ConfigService) => ({
     ),
     PostsModule,
   ],
-  providers: [CaptionProcessor, MediaProcessor, DispatchPostProcessor, RefreshTokenProcessor],
+  providers: [
+    CaptionProcessor,
+    MediaProcessor,
+    DispatchPostProcessor,
+    RefreshTokenProcessor,
+  ],
   exports: [BullModule],
 })
 export class JobsModule {}

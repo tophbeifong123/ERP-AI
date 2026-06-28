@@ -44,19 +44,31 @@ export class PostEventsService {
     try {
       switch (event) {
         case 'post_ready':
-          await this.notificationsService.create(owner.id, 'post_ready', post.id);
+          await this.notificationsService.create(
+            owner.id,
+            'post_ready',
+            post.id,
+          );
           await this.emailService.enqueuePostReady(owner.id, owner.email, {
             businessName: business.name,
             postId: post.id,
             caption: post.caption ?? '',
             postType: post.postType,
-            approvalDeadline: post.approvalDeadline ? post.approvalDeadline.toISOString() : null,
+            approvalDeadline: post.approvalDeadline
+              ? post.approvalDeadline.toISOString()
+              : null,
           });
           break;
         case 'post_posted':
-          await this.notificationsService.create(owner.id, 'post_posted', post.id);
+          await this.notificationsService.create(
+            owner.id,
+            'post_posted',
+            post.id,
+          );
           if (post.fbPageId) {
-            const page = await this.pageRepo.findOne({ where: { id: post.fbPageId } });
+            const page = await this.pageRepo.findOne({
+              where: { id: post.fbPageId },
+            });
             await this.emailService.enqueuePostPosted(owner.id, owner.email, {
               businessName: business.name,
               postId: post.id,
@@ -70,7 +82,11 @@ export class PostEventsService {
           }
           break;
         case 'post_failed':
-          await this.notificationsService.create(owner.id, 'post_failed', post.id);
+          await this.notificationsService.create(
+            owner.id,
+            'post_failed',
+            post.id,
+          );
           await this.emailService.enqueuePostFailed(owner.id, owner.email, {
             businessName: business.name,
             postId: post.id,
@@ -80,7 +96,11 @@ export class PostEventsService {
           });
           break;
         case 'post_expired':
-          await this.notificationsService.create(owner.id, 'post_expired', post.id);
+          await this.notificationsService.create(
+            owner.id,
+            'post_expired',
+            post.id,
+          );
           await this.emailService.enqueuePostExpired(owner.id, owner.email, {
             businessName: business.name,
             postId: post.id,
@@ -99,14 +119,27 @@ export class PostEventsService {
   async loadContext(postId: string): Promise<PostEventContext | null> {
     const post = await this.postRepo.findOne({ where: { id: postId } });
     if (!post) return null;
-    const business = await this.businessRepo.findOne({ where: { id: post.businessId } });
+    const business = await this.businessRepo.findOne({
+      where: { id: post.businessId },
+    });
     if (!business) return null;
-    const owner = await this.userRepo.findOne({ where: { id: business.ownerId } });
+    const owner = await this.userRepo.findOne({
+      where: { id: business.ownerId },
+    });
     if (!owner) return null;
     return { post, business, owner };
   }
 
-  async emitForStatus(postId: string, to: PostStatus, extra: { fbPostId?: string; errorCode?: string; errorMessage?: string; reason?: 'user_rejected' | 'timeout' } = {}): Promise<void> {
+  async emitForStatus(
+    postId: string,
+    to: PostStatus,
+    extra: {
+      fbPostId?: string;
+      errorCode?: string;
+      errorMessage?: string;
+      reason?: 'user_rejected' | 'timeout';
+    } = {},
+  ): Promise<void> {
     const ctx = await this.loadContext(postId);
     if (!ctx) return;
     if (to === 'pending_approval') {

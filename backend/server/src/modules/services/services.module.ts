@@ -10,7 +10,11 @@ import { AuthConfigModule } from '../auth/auth-config.module';
 import { FilesModule } from '../files/files.module';
 
 @Module({
-  imports: [AuthConfigModule, FilesModule, TypeOrmModule.forFeature([Service, Business, File, User])],
+  imports: [
+    AuthConfigModule,
+    FilesModule,
+    TypeOrmModule.forFeature([Service, Business, File, User]),
+  ],
   controllers: [ServicesController],
   providers: [ServicesService],
   exports: [ServicesService],

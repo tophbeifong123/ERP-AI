@@ -1,4 +1,11 @@
-import { Controller, Post, Param, UseInterceptors, UploadedFile, BadRequestException } from '@nestjs/common';
+import {
+  Controller,
+  Post,
+  Param,
+  UseInterceptors,
+  UploadedFile,
+  BadRequestException,
+} from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { FilesService } from './files.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -8,7 +15,9 @@ export class FilesController {
   constructor(private filesService: FilesService) {}
 
   @Post('upload/:kind')
-  @UseInterceptors(FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }))
+  @UseInterceptors(
+    FileInterceptor('file', { limits: { fileSize: 10 * 1024 * 1024 } }),
+  )
   async uploadFile(
     @CurrentUser('id') userId: string,
     @Param('kind') kind: string,
@@ -23,7 +32,13 @@ export class FilesController {
       throw new BadRequestException('Invalid file kind');
     }
 
-    const allowedMimes = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp', 'video/mp4'];
+    const allowedMimes = [
+      'image/png',
+      'image/jpeg',
+      'image/jpg',
+      'image/webp',
+      'video/mp4',
+    ];
     if (!allowedMimes.includes(file.mimetype)) {
       throw new BadRequestException('Invalid file type');
     }

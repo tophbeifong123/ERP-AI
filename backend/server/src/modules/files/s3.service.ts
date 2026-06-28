@@ -1,4 +1,11 @@
-import { S3Client, PutObjectCommand, GetObjectCommand, DeleteObjectCommand, HeadBucketCommand, CreateBucketCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  PutObjectCommand,
+  GetObjectCommand,
+  DeleteObjectCommand,
+  HeadBucketCommand,
+  CreateBucketCommand,
+} from '@aws-sdk/client-s3';
 import { getSignedUrl } from '@aws-sdk/s3-request-presigner';
 import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
@@ -32,7 +39,9 @@ export class S3Service implements OnModuleInit {
     const secretKey = this.configService.get<string>('s3.secretKey');
 
     this.bucket = this.configService.get<string>('s3.bucket') || 'erp-ai';
-    this.publicUrl = this.configService.get<string>('s3.publicUrl') || `${endpoint}/${this.bucket}`;
+    this.publicUrl =
+      this.configService.get<string>('s3.publicUrl') ||
+      `${endpoint}/${this.bucket}`;
 
     this.client = new S3Client({
       endpoint,
@@ -55,7 +64,9 @@ export class S3Service implements OnModuleInit {
       this.logger.log(`Bucket "${this.bucket}" exists`);
     } catch {
       try {
-        await this.client.send(new CreateBucketCommand({ Bucket: this.bucket }));
+        await this.client.send(
+          new CreateBucketCommand({ Bucket: this.bucket }),
+        );
         this.logger.log(`Created bucket "${this.bucket}"`);
       } catch (err) {
         this.logger.warn(`Could not create bucket: ${err}`);
@@ -63,7 +74,11 @@ export class S3Service implements OnModuleInit {
     }
   }
 
-  async uploadFile(buffer: Buffer, key: string, contentType: string): Promise<UploadResult> {
+  async uploadFile(
+    buffer: Buffer,
+    key: string,
+    contentType: string,
+  ): Promise<UploadResult> {
     await this.client.send(
       new PutObjectCommand({
         Bucket: this.bucket,
@@ -97,7 +112,9 @@ export class S3Service implements OnModuleInit {
       ContentType: contentType,
     });
 
-    const presignedUrl = await getSignedUrl(this.client, command, { expiresIn });
+    const presignedUrl = await getSignedUrl(this.client, command, {
+      expiresIn,
+    });
     const expiresAt = new Date(Date.now() + expiresIn * 1000);
 
     return {
@@ -108,7 +125,10 @@ export class S3Service implements OnModuleInit {
     };
   }
 
-  async generatePresignedDownloadUrl(key: string, expiresIn = 3600): Promise<string> {
+  async generatePresignedDownloadUrl(
+    key: string,
+    expiresIn = 3600,
+  ): Promise<string> {
     const command = new GetObjectCommand({
       Bucket: this.bucket,
       Key: key,

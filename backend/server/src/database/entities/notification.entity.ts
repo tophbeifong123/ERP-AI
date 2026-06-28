@@ -9,7 +9,11 @@ import {
 import { User } from './user.entity';
 import { Post } from './post.entity';
 
-export type NotificationType = 'post_ready' | 'post_posted' | 'post_failed' | 'post_expired';
+export type NotificationType =
+  | 'post_ready'
+  | 'post_posted'
+  | 'post_failed'
+  | 'post_expired';
 
 @Entity('notifications')
 export class Notification {

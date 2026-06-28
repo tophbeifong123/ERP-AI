@@ -59,7 +59,8 @@ export class SchedulerService {
     @InjectRepository(AiJob) private jobRepo: Repository<AiJob>,
     @InjectRepository(FacebookPage) private pageRepo: Repository<FacebookPage>,
     @InjectRepository(Service) private serviceRepo: Repository<Service>,
-    @InjectRepository(PostFeaturedService) private featuredRepo: Repository<PostFeaturedService>,
+    @InjectRepository(PostFeaturedService)
+    private featuredRepo: Repository<PostFeaturedService>,
     @InjectRepository(File) private fileRepo: Repository<File>,
     @InjectQueue('dispatch-post') private dispatchQueue: Queue,
     @InjectQueue('refresh-token-cleanup') private refreshTokenQueue: Queue,
@@ -88,6 +89,9 @@ export class SchedulerService {
     const callbackUrl = `${appUrl}/internal/ai/decide/callback`;
 
     for (const biz of businesses) {
+      this.logger.log(
+        `Business ${biz.id} mode=${biz.autoPostMode} target/week=${biz.postsPerWeekTarget}`,
+      );
       try {
         const plan = await this.aiService.createPendingPlan(biz.id);
 
@@ -107,7 +111,10 @@ export class SchedulerService {
         const fourteenDaysAgo = new Date(Date.now() - 14 * 24 * 3600 * 1000);
         const recentInWindow = recentPosts
           .filter((p) => p.postedAt && p.postedAt >= fourteenDaysAgo)
-          .map((p) => ({ postedAt: p.postedAt!.toISOString(), postType: p.postType ?? '' }));
+          .map((p) => ({
+            postedAt: p.postedAt!.toISOString(),
+            postType: p.postType ?? '',
+          }));
 
         const lastThreePostedIds = recentPosts
           .filter((p) => p.postedAt)
@@ -119,7 +126,9 @@ export class SchedulerService {
             .createQueryBuilder('pf')
             .where('pf.postId IN (:...ids)', { ids: lastThreePostedIds })
             .getMany();
-          recentFeatured = Array.from(new Set(featuredRows.map((r) => r.serviceId)));
+          recentFeatured = Array.from(
+            new Set(featuredRows.map((r) => r.serviceId)),
+          );
         }
 
         const mondayBkk = this.getMondayBangkok(new Date());
@@ -132,11 +141,15 @@ export class SchedulerService {
           .getCount();
 
         const lastPost = recentPosts[0] ?? null;
-        const lastPostAt = lastPost?.postedAt ? lastPost.postedAt.toISOString() : null;
+        const lastPostAt = lastPost?.postedAt
+          ? lastPost.postedAt.toISOString()
+          : null;
 
         let logoPublicUrl: string | null = null;
         if (biz.logoFileId) {
-          const logo = await this.fileRepo.findOne({ where: { id: biz.logoFileId } });
+          const logo = await this.fileRepo.findOne({
+            where: { id: biz.logoFileId },
+          });
           logoPublicUrl = logo?.publicUrl ?? null;
         }
 
@@ -195,7 +208,9 @@ export class SchedulerService {
         );
       } catch (err) {
         const message = err instanceof Error ? err.message : String(err);
-        this.logger.error(`dailyDecide failed for business ${biz.id}: ${message}`);
+        this.logger.error(
+          `dailyDecide failed for business ${biz.id}: ${message}`,
+        );
       }
     }
   }
@@ -214,11 +229,17 @@ export class SchedulerService {
   async materializeFixedSchedule() {
     this.logger.log('Running materialize fixed schedule cron');
     const businesses = await this.businessRepo.find({
-      where: { autoPostEnabled: true, autoPostMode: 'fixed_schedule', deletedAt: IsNull() },
+      where: {
+        autoPostEnabled: true,
+        autoPostMode: 'fixed_schedule',
+        deletedAt: IsNull(),
+      },
     });
     for (const biz of businesses) {
       for (const rule of biz.fixedScheduleRules ?? []) {
-        this.logger.log(`Fixed schedule rule for ${biz.id}: day=${rule.dayOfWeek} time=${rule.time}`);
+        this.logger.log(
+          `Fixed schedule rule for ${biz.id}: day=${rule.dayOfWeek} time=${rule.time}`,
+        );
       }
     }
   }
@@ -227,11 +248,19 @@ export class SchedulerService {
   async dispatchDuePosts() {
     const now = new Date();
     const due = await this.postRepo.find({
-      where: { status: 'approved', scheduledAt: LessThanOrEqual(now), deletedAt: IsNull() },
+      where: {
+        status: 'approved',
+        scheduledAt: LessThanOrEqual(now),
+        deletedAt: IsNull(),
+      },
       take: 50,
     });
     for (const post of due) {
-      await this.dispatchQueue.add('dispatch', { postId: post.id }, { jobId: `dispatch-${post.id}` });
+      await this.dispatchQueue.add(
+        'dispatch',
+        { postId: post.id },
+        { jobId: `dispatch-${post.id}` },
+      );
       this.logger.log(`Enqueued dispatch for post ${post.id}`);
     }
   }
@@ -251,7 +280,9 @@ export class SchedulerService {
       post.status = 'expired';
       post.rejectionReason = 'timeout';
       await this.postRepo.save(post);
-      await this.postEvents.emitForStatus(post.id, 'expired', { reason: 'timeout' });
+      await this.postEvents.emitForStatus(post.id, 'expired', {
+        reason: 'timeout',
+      });
       this.logger.warn(`Post ${post.id} expired due to timeout`);
     }
   }
@@ -265,7 +296,9 @@ export class SchedulerService {
       order: { nextRunAt: 'ASC' },
     });
     for (const job of due) {
-      this.logger.log(`Retrying AI job ${job.id} type=${job.type} attempt=${job.attempts + 1}`);
+      this.logger.log(
+        `Retrying AI job ${job.id} type=${job.type} attempt=${job.attempts + 1}`,
+      );
     }
   }
 
@@ -285,7 +318,11 @@ export class SchedulerService {
 
   @Cron(CronExpression.EVERY_DAY_AT_2AM)
   async enqueueRefreshTokenCleanup() {
-    await this.refreshTokenQueue.add('cleanup', { olderThanDays: 30 }, { jobId: 'rt-cleanup-daily' });
+    await this.refreshTokenQueue.add(
+      'cleanup',
+      { olderThanDays: 30 },
+      { jobId: 'rt-cleanup-daily' },
+    );
     this.logger.log('Enqueued refresh-token cleanup');
   }
 

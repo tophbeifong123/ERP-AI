@@ -6,12 +6,11 @@ import { Queue } from 'bullmq';
 import { Post } from '../../database/entities/post.entity';
 import { PostMedia, PostMediaKind } from '../../database/entities/post-media.entity';
 import { ContentPlan } from '../../database/entities/content-plan.entity';
-import { AiJob, AiJobType, AiJobStatus } from '../../database/entities/ai-job.entity';
+import { AiJob } from '../../database/entities/ai-job.entity';
 import { Business } from '../../database/entities/business.entity';
 import { Service } from '../../database/entities/service.entity';
 import { File } from '../../database/entities/file.entity';
 import { PostStateMachine } from './state-machine';
-import { PostStateMachine as PostStateMachineFromPosts } from '../posts/state-machine';
 import { PostEventsService } from '../posts/post-events.service';
 
 export interface DecideDto {

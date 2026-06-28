@@ -67,8 +67,12 @@ export class InitSchema1700000000000 implements MigrationInterface {
         deleted_at TIMESTAMPTZ
       )
     `);
-    await queryRunner.query(`CREATE INDEX idx_files_owner_id ON files(owner_id)`);
-    await queryRunner.query(`CREATE INDEX idx_files_kind_created_at ON files(kind, created_at)`);
+    await queryRunner.query(
+      `CREATE INDEX idx_files_owner_id ON files(owner_id)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_files_kind_created_at ON files(kind, created_at)`,
+    );
 
     await queryRunner.query(`
       CREATE TABLE businesses (
@@ -91,7 +95,9 @@ export class InitSchema1700000000000 implements MigrationInterface {
         deleted_at TIMESTAMPTZ
       )
     `);
-    await queryRunner.query(`CREATE INDEX idx_businesses_owner_id ON businesses(owner_id) WHERE deleted_at IS NULL`);
+    await queryRunner.query(
+      `CREATE INDEX idx_businesses_owner_id ON businesses(owner_id) WHERE deleted_at IS NULL`,
+    );
 
     await queryRunner.query(`
       CREATE TABLE services (
@@ -108,7 +114,9 @@ export class InitSchema1700000000000 implements MigrationInterface {
         deleted_at TIMESTAMPTZ
       )
     `);
-    await queryRunner.query(`CREATE INDEX idx_services_business_id ON services(business_id) WHERE deleted_at IS NULL AND is_active = TRUE`);
+    await queryRunner.query(
+      `CREATE INDEX idx_services_business_id ON services(business_id) WHERE deleted_at IS NULL AND is_active = TRUE`,
+    );
 
     await queryRunner.query(`
       CREATE TABLE facebook_pages (
@@ -125,8 +133,12 @@ export class InitSchema1700000000000 implements MigrationInterface {
         deleted_at TIMESTAMPTZ
       )
     `);
-    await queryRunner.query(`CREATE UNIQUE INDEX idx_facebook_pages_business_fb_page ON facebook_pages(business_id, fb_page_id) WHERE deleted_at IS NULL`);
-    await queryRunner.query(`CREATE INDEX idx_facebook_pages_token_expires_at ON facebook_pages(token_expires_at)`);
+    await queryRunner.query(
+      `CREATE UNIQUE INDEX idx_facebook_pages_business_fb_page ON facebook_pages(business_id, fb_page_id) WHERE deleted_at IS NULL`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_facebook_pages_token_expires_at ON facebook_pages(token_expires_at)`,
+    );
 
     await queryRunner.query(`
       CREATE TABLE posts (
@@ -149,10 +161,18 @@ export class InitSchema1700000000000 implements MigrationInterface {
         deleted_at TIMESTAMPTZ
       )
     `);
-    await queryRunner.query(`CREATE INDEX idx_posts_business_status_created ON posts(business_id, status, created_at DESC)`);
-    await queryRunner.query(`CREATE INDEX idx_posts_status_scheduled_approved ON posts(status, scheduled_at) WHERE status = 'approved'`);
-    await queryRunner.query(`CREATE INDEX idx_posts_status_scheduled_pending ON posts(status, scheduled_at) WHERE status = 'pending_approval'`);
-    await queryRunner.query(`CREATE INDEX idx_posts_business_posted ON posts(business_id, posted_at DESC) WHERE status = 'posted'`);
+    await queryRunner.query(
+      `CREATE INDEX idx_posts_business_status_created ON posts(business_id, status, created_at DESC)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_posts_status_scheduled_approved ON posts(status, scheduled_at) WHERE status = 'approved'`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_posts_status_scheduled_pending ON posts(status, scheduled_at) WHERE status = 'pending_approval'`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_posts_business_posted ON posts(business_id, posted_at DESC) WHERE status = 'posted'`,
+    );
 
     await queryRunner.query(`
       CREATE TABLE content_plans (
@@ -212,8 +232,12 @@ export class InitSchema1700000000000 implements MigrationInterface {
         updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
       )
     `);
-    await queryRunner.query(`CREATE INDEX idx_ai_jobs_status_next_run ON ai_jobs(status, next_run_at)`);
-    await queryRunner.query(`CREATE INDEX idx_ai_jobs_post_id ON ai_jobs(post_id)`);
+    await queryRunner.query(
+      `CREATE INDEX idx_ai_jobs_status_next_run ON ai_jobs(status, next_run_at)`,
+    );
+    await queryRunner.query(
+      `CREATE INDEX idx_ai_jobs_post_id ON ai_jobs(post_id)`,
+    );
 
     await queryRunner.query(`
       CREATE TABLE notifications (
@@ -257,7 +281,9 @@ export class InitSchema1700000000000 implements MigrationInterface {
     await queryRunner.query(`DROP TABLE IF EXISTS email_logs CASCADE`);
     await queryRunner.query(`DROP TABLE IF EXISTS notifications CASCADE`);
     await queryRunner.query(`DROP TABLE IF EXISTS ai_jobs CASCADE`);
-    await queryRunner.query(`DROP TABLE IF EXISTS post_featured_services CASCADE`);
+    await queryRunner.query(
+      `DROP TABLE IF EXISTS post_featured_services CASCADE`,
+    );
     await queryRunner.query(`DROP TABLE IF EXISTS post_media CASCADE`);
     await queryRunner.query(`DROP TABLE IF EXISTS content_plans CASCADE`);
     await queryRunner.query(`DROP TABLE IF EXISTS posts CASCADE`);

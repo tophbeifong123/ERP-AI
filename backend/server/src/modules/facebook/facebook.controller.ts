@@ -37,7 +37,9 @@ export class FacebookController {
     @Res() res: Response,
   ) {
     if (!businessId) {
-      return res.status(400).json({ message: 'businessId is required', error: 'bad_request' });
+      return res
+        .status(400)
+        .json({ message: 'businessId is required', error: 'bad_request' });
     }
     const url = await this.facebookService.buildOAuthUrl(userId, businessId);
     return res.redirect(url);
@@ -55,11 +57,18 @@ export class FacebookController {
       return res.redirect(`${frontendUrl}/businesses?fb=missing_params`);
     }
     try {
-      const { businessId } = await this.facebookService.handleCallback(code, state);
-      return res.redirect(`${frontendUrl}/businesses/${businessId}?fb=connected`);
+      const { businessId } = await this.facebookService.handleCallback(
+        code,
+        state,
+      );
+      return res.redirect(
+        `${frontendUrl}/businesses/${businessId}?fb=connected`,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'callback_failed';
-      return res.redirect(`${frontendUrl}/businesses?fb=error&msg=${encodeURIComponent(msg)}`);
+      return res.redirect(
+        `${frontendUrl}/businesses?fb=error&msg=${encodeURIComponent(msg)}`,
+      );
     }
   }
 
@@ -69,7 +78,10 @@ export class FacebookController {
     @Query('businessId', new ParseUUIDPipe()) businessId: string,
     @CurrentUser('id') userId: string,
   ) {
-    const pages = await this.facebookService.listPagesForUser(userId, businessId);
+    const pages = await this.facebookService.listPagesForUser(
+      userId,
+      businessId,
+    );
     return { pages };
   }
 
@@ -82,7 +94,11 @@ export class FacebookController {
     @CurrentUser('id') userId: string,
     @Body() dto: ConnectPageDto,
   ) {
-    const facebookPage = await this.facebookService.connectPage(userId, businessId, dto.fbPageId);
+    const facebookPage = await this.facebookService.connectPage(
+      userId,
+      businessId,
+      dto.fbPageId,
+    );
     return { facebookPage };
   }
 
@@ -105,7 +121,12 @@ export class FacebookController {
       storage: memoryStorage(),
       limits: { fileSize: 10 * 1024 * 1024 },
       fileFilter: (_req, file, cb) => {
-        const ok = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.mimetype);
+        const ok = [
+          'image/png',
+          'image/jpeg',
+          'image/jpg',
+          'image/webp',
+        ].includes(file.mimetype);
         cb(ok ? null : new BadRequestException('invalid_file_type'), ok);
       },
     }),
@@ -116,19 +137,32 @@ export class FacebookController {
     @Body('fbPageId') fbPageId: string,
   ) {
     if (!file) {
-      throw new BadRequestException({ message: 'file_required', error: 'bad_request' });
+      throw new BadRequestException({
+        message: 'file_required',
+        error: 'bad_request',
+      });
     }
     if (!caption) {
-      throw new BadRequestException({ message: 'caption_required', error: 'bad_request' });
+      throw new BadRequestException({
+        message: 'caption_required',
+        error: 'bad_request',
+      });
     }
     if (!fbPageId) {
-      throw new BadRequestException({ message: 'fbPageId_required', error: 'bad_request' });
+      throw new BadRequestException({
+        message: 'fbPageId_required',
+        error: 'bad_request',
+      });
     }
-    const result = await this.facebookService.testPostToPage(fbPageId, caption, {
-      buffer: file.buffer,
-      mime: file.mimetype,
-      originalName: file.originalname,
-    });
+    const result = await this.facebookService.testPostToPage(
+      fbPageId,
+      caption,
+      {
+        buffer: file.buffer,
+        mime: file.mimetype,
+        originalName: file.originalname,
+      },
+    );
     return result;
   }
 }

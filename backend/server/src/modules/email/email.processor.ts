@@ -33,7 +33,8 @@ export class EmailProcessor extends WorkerHost {
       secure: false,
       ignoreTLS: true,
       auth:
-        this.configService.get<string>('mail.user') && this.configService.get<string>('mail.pass')
+        this.configService.get<string>('mail.user') &&
+        this.configService.get<string>('mail.pass')
           ? {
               user: this.configService.get<string>('mail.user'),
               pass: this.configService.get<string>('mail.pass'),
@@ -44,17 +45,24 @@ export class EmailProcessor extends WorkerHost {
 
   async process(job: Job<EmailJobData>): Promise<{ messageId: string }> {
     const { template, userId, to, payload } = job.data;
-    const appUrl = this.configService.get<string>('app.appUrl') || 'http://localhost:3000';
-    const frontendUrl = this.configService.get<string>('app.frontendUrl') || 'http://localhost:3001';
+    const appUrl =
+      this.configService.get<string>('app.appUrl') || 'http://localhost:3000';
+    const frontendUrl =
+      this.configService.get<string>('app.frontendUrl') ||
+      'http://localhost:3001';
     const from = this.configService.get<string>('mail.from');
 
     let rendered: { subject: string; html: string; text: string };
     if (template === 'verify-email') {
       const token = payload.token as string;
-      rendered = renderVerifyEmail(`${appUrl}/auth/verify-email?token=${token}`);
+      rendered = renderVerifyEmail(
+        `${appUrl}/auth/verify-email?token=${token}`,
+      );
     } else if (template === 'reset-password') {
       const token = payload.token as string;
-      rendered = renderResetPassword(`${appUrl}/auth/reset-password?token=${token}`);
+      rendered = renderResetPassword(
+        `${appUrl}/auth/reset-password?token=${token}`,
+      );
     } else if (template === 'post-ready') {
       rendered = renderPostReady({
         businessName: payload.businessName as string,
@@ -69,7 +77,8 @@ export class EmailProcessor extends WorkerHost {
         businessName: payload.businessName as string,
         postId: payload.postId as string,
         caption: (payload.caption as string) ?? '',
-        reason: (payload.reason as 'user_rejected' | 'timeout') ?? 'user_rejected',
+        reason:
+          (payload.reason as 'user_rejected' | 'timeout') ?? 'user_rejected',
         reviewUrl: `${frontendUrl}/posts/${payload.postId}`,
       });
     } else if (template === 'post-posted') {
@@ -114,11 +123,16 @@ export class EmailProcessor extends WorkerHost {
         providerMessageId: info.messageId ?? null,
         error: null,
       });
-      this.logger.log(`Sent ${template} to ${to} (messageId=${info.messageId ?? 'n/a'})`);
+      this.logger.log(
+        `Sent ${template} to ${to} (messageId=${info.messageId ?? 'n/a'})`,
+      );
       return { messageId: info.messageId ?? '' };
     } catch (err) {
       const message = err instanceof Error ? err.message : String(err);
-      await this.emailLogRepo.update(log.id, { status: 'failed', error: message });
+      await this.emailLogRepo.update(log.id, {
+        status: 'failed',
+        error: message,
+      });
       this.logger.error(`Failed to send ${template} to ${to}: ${message}`);
       throw err;
     }

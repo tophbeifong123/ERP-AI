@@ -8,7 +8,10 @@ import { FacebookController } from './facebook.controller';
 import { AuthConfigModule } from '../auth/auth-config.module';
 
 @Module({
-  imports: [AuthConfigModule, TypeOrmModule.forFeature([FacebookPage, Business, User])],
+  imports: [
+    AuthConfigModule,
+    TypeOrmModule.forFeature([FacebookPage, Business, User]),
+  ],
   controllers: [FacebookController],
   providers: [FacebookService],
   exports: [FacebookService],
