@@ -9,7 +9,10 @@ import {
   Trash2,
   AlertTriangle,
   Loader2,
-  Settings
+  Settings,
+  Camera,
+  MessageSquare,
+  Globe
 } from 'lucide-react';
 import { toast } from 'sonner';
 
@@ -262,7 +265,9 @@ function SettingsContent() {
           [
             { key: 'profile', l: 'ข้อมูลทั่วไปธุรกิจ', icon: Briefcase },
             { key: 'autopost', l: 'ระบบโพสต์อัตโนมัติ', icon: Clock },
-            { key: 'facebook', l: 'เชื่อมต่อ Facebook Page', icon: Settings },
+            { key: 'facebook', l: 'เชื่อมต่อ Facebook Page', icon: Globe },
+            { key: 'instagram', l: 'เชื่อมต่อ Instagram', icon: Camera },
+            { key: 'line', l: 'เชื่อมต่อ LINE OA', icon: MessageSquare },
             { key: 'danger', l: 'Danger Zone (ลบธุรกิจ)', icon: Trash2 },
           ] as const
         ).map((tab) => {
@@ -391,6 +396,44 @@ function SettingsContent() {
                 finalizeText="บันทึกการผูกเพจ Facebook"
               />
             )}
+          </div>
+        )}
+
+        {/* Tab Mock: Instagram Connection */}
+        {activeTab === 'instagram' && (
+          <div className="space-y-6 text-center py-10 max-w-sm mx-auto">
+            <div className="w-16 h-16 rounded-full bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 flex items-center justify-center text-white mx-auto shadow-lg shadow-pink-500/20">
+              <Camera className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-foreground">เชื่อมต่อระบบ Instagram Business</h2>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                คุณจะสามารถส่งออกภาพและวิดีโอ (Reels) ไปยังหน้าฟีดของ Instagram ได้พร้อมๆ กับการโพสต์บน Facebook Page ในคลิกเดียว
+              </p>
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-primary/10 text-primary border border-primary/20 text-xxs font-bold mt-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-primary block animate-pulse" />
+              Coming Soon — เร็วๆ นี้
+            </div>
+          </div>
+        )}
+
+        {/* Tab Mock: LINE OA Connection */}
+        {activeTab === 'line' && (
+          <div className="space-y-6 text-center py-10 max-w-sm mx-auto">
+            <div className="w-16 h-16 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 mx-auto shadow-lg shadow-emerald-500/5">
+              <MessageSquare className="w-8 h-8" />
+            </div>
+            <div className="space-y-2">
+              <h2 className="text-xl font-bold text-foreground">เชื่อมต่อบัญชี LINE Official Account</h2>
+              <p className="text-xs text-muted-foreground leading-relaxed">
+                ส่งข้อความโปรโมชั่นแนะนำสินค้า ข่าวสาร กิจกรรม หรือบรอดแคสต์หาลูกค้าใน LINE OA พร้อมระบบ AI คอยพิมพ์โต้ตอบแบบเรียลไทม์
+              </p>
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-1.5 rounded-full bg-emerald-500/10 text-emerald-500 border border-emerald-500/20 text-xxs font-bold mt-2">
+              <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 block animate-pulse" />
+              Coming Soon — เร็วๆ นี้
+            </div>
           </div>
         )}
 

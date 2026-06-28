@@ -325,13 +325,28 @@ export default function DashboardPage() {
               </div>
             )}
 
+            {/* LINE OA Connection Mockup */}
             <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/35 opacity-50">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center text-green-600 dark:text-green-400 font-extrabold text-xs shrink-0">
+                <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-600 dark:text-emerald-400 font-extrabold text-xs shrink-0">
                   L
                 </div>
                 <div>
                   <span className="block text-xs font-bold text-foreground">LINE OA</span>
+                  <span className="block text-xxs text-muted-foreground">ยังไม่เชื่อมต่อ</span>
+                </div>
+              </div>
+              <span className="w-2 h-2 rounded-full bg-muted-foreground block shrink-0" />
+            </div>
+
+            {/* Instagram Connection Mockup */}
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/35 opacity-50">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 flex items-center justify-center text-white font-extrabold text-xxs shrink-0">
+                  IG
+                </div>
+                <div>
+                  <span className="block text-xs font-bold text-foreground">Instagram Business</span>
                   <span className="block text-xxs text-muted-foreground">ยังไม่เชื่อมต่อ</span>
                 </div>
               </div>
