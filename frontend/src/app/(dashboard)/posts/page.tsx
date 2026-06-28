@@ -282,12 +282,30 @@ export default function PostsPage() {
                          post.postType === 'product_showcase' ? 'แนะนำสินค้า' : 
                          post.postType === 'brand_awareness' ? 'สร้างแบรนด์' : 'กิจกรรม'}
                       </span>
+                      <span className="text-xxs text-muted-foreground bg-muted/65 px-1.5 py-0.5 rounded border border-border/40">
+                        {post.generationSource === 'auto_ai' ? '🤖 AI อัจฉริยะ' : 
+                         post.generationSource === 'fixed_schedule' ? '📅 ตารางประจำ' : '✏️ สร้างเอง'}
+                      </span>
                       {getStatusBadge(post.status)}
                     </div>
 
                     <p className="text-xs text-foreground font-medium pr-4 leading-relaxed whitespace-pre-wrap">
                       {post.caption || 'ไม่มีข้อความประกอบโพสต์'}
                     </p>
+
+                    {/* Error Message for failed posts */}
+                    {post.status === 'failed' && post.errorMessage && (
+                      <div className="text-xxs text-red-400 bg-red-500/5 border border-red-500/10 rounded-md p-2 mt-1 leading-normal max-w-lg">
+                        ⚠️ ข้อผิดพลาด: {post.errorMessage}
+                      </div>
+                    )}
+
+                    {/* Approval Deadline for pending posts */}
+                    {post.status === 'pending_approval' && post.approvalDeadline && (
+                      <div className="text-xxs text-amber-500/90 font-medium flex items-center gap-1 mt-1">
+                        <span>⏳ จะหมดอายุอนุมัติ: {new Date(post.approvalDeadline).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</span>
+                      </div>
+                    )}
 
                     <div className="flex items-center gap-4 text-xxs text-muted-foreground flex-wrap pt-1">
                       <span className="flex items-center gap-1">
