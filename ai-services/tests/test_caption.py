@@ -4,8 +4,8 @@ Groq and the callback are mocked, so no real API/network calls happen.
 """
 import json
 
-from app.schemas.caption import CaptionRequest
-from app.schemas.decision import BusinessContext, ServiceInfo, PostType
+from app.schemas.caption import CaptionRequest, FeaturedService
+from app.schemas.decision import BusinessContext, PostType
 from app.services import caption_service
 
 
@@ -32,7 +32,7 @@ def _request(**overrides) -> CaptionRequest:
         post_id="post-123",
         business=BusinessContext(id="b1", name="ร้านกาแฟ", tone="เป็นกันเอง"),
         post_type=PostType.PROMOTION,
-        featured_services=[ServiceInfo(id="svc-1", name="ลาเต้", price=6500, currency="THB")],
+        featured_services=[FeaturedService(id="svc-1", name="ลาเต้", price=6500, currency="THB")],
         caption_hint="ซื้อ 1 แถม 1",
         target_audience="คนรุ่นใหม่",
     )
