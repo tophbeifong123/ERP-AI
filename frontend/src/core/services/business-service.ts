@@ -101,4 +101,35 @@ export const businessService = {
     );
     return response.data;
   },
+
+  /**
+   * อัปเดตข้อมูลทั่วไปของธุรกิจ (PATCH /businesses/:id)
+   */
+  async updateBusiness(id: string, data: Partial<CreateBusinessData>, logoFile?: File): Promise<Business> {
+    const formData = new FormData();
+    if (data.name) formData.append('name', data.name);
+    if (data.industry) formData.append('industry', data.industry);
+    if (data.description !== undefined) formData.append('description', data.description || '');
+    if (data.targetAudience !== undefined) formData.append('targetAudience', data.targetAudience || '');
+    if (data.tone) formData.append('tone', data.tone);
+    if (data.keywords) formData.append('keywords', JSON.stringify(data.keywords));
+
+    if (logoFile) {
+      formData.append('logo', logoFile);
+    }
+
+    const response = await apiClient.patch<{ business: Business }>(`/businesses/${id}`, formData, {
+      headers: {
+        'Content-Type': 'multipart/form-data',
+      },
+    });
+    return response.data.business;
+  },
+
+  /**
+   * ลบธุรกิจ (DELETE /businesses/:id)
+   */
+  async deleteBusiness(id: string): Promise<void> {
+    await apiClient.delete(`/businesses/${id}`);
+  },
 };

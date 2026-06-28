@@ -32,7 +32,9 @@ export class ServicesController {
   @Post('businesses/:id/services')
   @UseGuards(OwnerGuard)
   @ResourceType('business')
-  @UseInterceptors(FileInterceptor('image', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @UseInterceptors(
+    FileInterceptor('image', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
   @HttpCode(HttpStatus.CREATED)
   async create(
     @Param('id', new ParseUUIDPipe()) businessId: string,
@@ -40,7 +42,12 @@ export class ServicesController {
     @Body() dto: CreateServiceDto,
     @UploadedFile() image?: Express.Multer.File,
   ) {
-    const service = await this.servicesService.create(businessId, userId, dto, image);
+    const service = await this.servicesService.create(
+      businessId,
+      userId,
+      dto,
+      image,
+    );
     return { service };
   }
 

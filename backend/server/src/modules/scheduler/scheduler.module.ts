@@ -21,13 +21,25 @@ const queueFactory = (config: ConfigService) => ({
 @Module({
   imports: [
     ScheduleModule.forRoot(),
-    TypeOrmModule.forFeature([Business, Post, ContentPlan, AiJob, FacebookPage]),
-    BullModule.registerQueueAsync(
-      { name: 'dispatch-post', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
-    ),
-    BullModule.registerQueueAsync(
-      { name: 'refresh-token-cleanup', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
-    ),
+    TypeOrmModule.forFeature([
+      Business,
+      Post,
+      ContentPlan,
+      AiJob,
+      FacebookPage,
+    ]),
+    BullModule.registerQueueAsync({
+      name: 'dispatch-post',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: queueFactory,
+    }),
+    BullModule.registerQueueAsync({
+      name: 'refresh-token-cleanup',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: queueFactory,
+    }),
     PostsModule,
   ],
   providers: [SchedulerService],

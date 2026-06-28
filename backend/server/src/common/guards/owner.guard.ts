@@ -1,4 +1,10 @@
-import { CanActivate, ExecutionContext, ForbiddenException, Inject, Injectable } from '@nestjs/common';
+import {
+  CanActivate,
+  ExecutionContext,
+  ForbiddenException,
+  Inject,
+  Injectable,
+} from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { DataSource } from 'typeorm';
 import { IS_PUBLIC_KEY } from '../decorators/public.decorator';
@@ -18,10 +24,10 @@ export class OwnerGuard implements CanActivate {
       throw new ForbiddenException('not_authenticated');
     }
 
-    const resourceType = this.reflector.getAllAndOverride<string>(RESOURCE_TYPE_KEY, [
-      context.getHandler(),
-      context.getClass(),
-    ]);
+    const resourceType = this.reflector.getAllAndOverride<string>(
+      RESOURCE_TYPE_KEY,
+      [context.getHandler(), context.getClass()],
+    );
     if (!resourceType) {
       return true;
     }
@@ -42,7 +48,10 @@ export class OwnerGuard implements CanActivate {
     return true;
   }
 
-  private async resolveOwnerId(resourceType: string, resourceId: string): Promise<string | null> {
+  private async resolveOwnerId(
+    resourceType: string,
+    resourceId: string,
+  ): Promise<string | null> {
     switch (resourceType) {
       case 'business': {
         const row = await this.dataSource.query(

@@ -1,5 +1,20 @@
-import { Body, Controller, HttpCode, HttpStatus, Param, ParseUUIDPipe, Post } from '@nestjs/common';
-import { AiService, CaptionDto, DecideDto, FailDto, ImageCallbackDto, ShortVideoCallbackDto } from './ai.service';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+} from '@nestjs/common';
+import {
+  AiService,
+  CaptionDto,
+  DecideDto,
+  FailDto,
+  ImageCallbackDto,
+  ShortVideoCallbackDto,
+} from './ai.service';
 import { Public } from '../../common/decorators/public.decorator';
 import { InternalTokenGuard } from '../../common/guards/internal-token.guard';
 import { UseGuards } from '@nestjs/common';

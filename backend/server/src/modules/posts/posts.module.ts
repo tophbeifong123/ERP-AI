@@ -23,13 +23,26 @@ const queueFactory = (config: ConfigService) => ({
 @Module({
   imports: [
     AuthConfigModule,
-    TypeOrmModule.forFeature([Post, PostMedia, PostFeaturedService, Business, User, AiJob]),
-    BullModule.registerQueueAsync(
-      { name: 'caption', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
-    ),
-    BullModule.registerQueueAsync(
-      { name: 'media', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
-    ),
+    TypeOrmModule.forFeature([
+      Post,
+      PostMedia,
+      PostFeaturedService,
+      Business,
+      User,
+      AiJob,
+    ]),
+    BullModule.registerQueueAsync({
+      name: 'caption',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: queueFactory,
+    }),
+    BullModule.registerQueueAsync({
+      name: 'media',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: queueFactory,
+    }),
     PostEventsModule,
   ],
   controllers: [PostsController],

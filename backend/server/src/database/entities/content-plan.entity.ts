@@ -35,13 +35,22 @@ export class ContentPlan {
   @Column({ name: 'suggested_post_type', type: 'text', nullable: true })
   suggestedPostType: string | null;
 
-  @Column({ name: 'suggested_featured_service_ids', type: 'uuid', array: true, default: '{}' })
+  @Column({
+    name: 'suggested_featured_service_ids',
+    type: 'uuid',
+    array: true,
+    default: '{}',
+  })
   suggestedFeaturedServiceIds: string[];
 
   @Column({ name: 'suggested_caption_hint', type: 'text', nullable: true })
   suggestedCaptionHint: string | null;
 
-  @Column({ name: 'suggested_scheduled_at', type: 'timestamptz', nullable: true })
+  @Column({
+    name: 'suggested_scheduled_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
   suggestedScheduledAt: Date | null;
 
   @Column({ name: 'target_window_start', type: 'timestamptz', nullable: true })
@@ -59,7 +68,9 @@ export class ContentPlan {
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @ManyToOne(() => Business, (business) => business.contentPlans, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Business, (business) => business.contentPlans, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'business_id' })
   business: Business;
 

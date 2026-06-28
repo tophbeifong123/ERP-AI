@@ -37,38 +37,53 @@ export class DispatchPostProcessor extends WorkerHost {
       return { fbPostId: post.fbPostId ?? '' };
     }
     if (post.status !== 'approved') {
-      this.logger.warn(`Post ${postId} is in status ${post.status}, skipping dispatch`);
+      this.logger.warn(
+        `Post ${postId} is in status ${post.status}, skipping dispatch`,
+      );
       return { fbPostId: '' };
     }
     if (!post.fbPageId) {
       throw new Error(`Post ${postId} has no fbPageId`);
     }
 
-    const page = await this.pageRepo.findOne({ where: { id: post.fbPageId, deletedAt: IsNull() } });
+    const page = await this.pageRepo.findOne({
+      where: { id: post.fbPageId, deletedAt: IsNull() },
+    });
     if (!page) {
       throw new Error(`Facebook page ${post.fbPageId} not found`);
     }
     const accessToken = this.encryption.decrypt(page.accessTokenEncrypted);
-    const graphVersion = this.configService.get<string>('app.facebook.graphVersion') || 'v19.0';
+    const graphVersion =
+      this.configService.get<string>('app.facebook.graphVersion') || 'v19.0';
 
     try {
-      const res = await fetch(`https://graph.facebook.com/${graphVersion}/${page.fbPageId}/feed`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({
-          message: post.caption ?? '',
-          access_token: accessToken,
-        }),
-      });
-      const data = (await res.json()) as { id?: string; error?: { message: string; code: number } };
+      const res = await fetch(
+        `https://graph.facebook.com/${graphVersion}/${page.fbPageId}/feed`,
+        {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            message: post.caption ?? '',
+            access_token: accessToken,
+          }),
+        },
+      );
+      const data = (await res.json()) as {
+        id?: string;
+        error?: { message: string; code: number };
+      };
       if (!res.ok || !data.id) {
-        const msg = data.error?.message ?? `Facebook API returned ${res.status}`;
+        const msg =
+          data.error?.message ?? `Facebook API returned ${res.status}`;
         const code = data.error?.code ? `E${data.error.code}` : 'E_FB';
         post.status = 'failed';
         post.errorCode = code;
         post.errorMessage = msg;
         await this.postRepo.save(post);
-        await this.postEvents.emitForStatus(post.id, 'failed', { errorCode: code, errorMessage: msg });
+        await this.postEvents.emitForStatus(post.id, 'failed', {
+          errorCode: code,
+          errorMessage: msg,
+        });
         throw new Error(msg);
       }
 
@@ -78,11 +93,15 @@ export class DispatchPostProcessor extends WorkerHost {
       post.errorCode = null;
       post.errorMessage = null;
       await this.postRepo.save(post);
-      await this.postEvents.emitForStatus(post.id, 'posted', { fbPostId: data.id });
+      await this.postEvents.emitForStatus(post.id, 'posted', {
+        fbPostId: data.id,
+      });
       this.logger.log(`Post ${postId} posted to FB (id=${data.id})`);
       return { fbPostId: data.id };
     } catch (err) {
-      this.logger.error(`Dispatch post ${postId} failed: ${err instanceof Error ? err.message : String(err)}`);
+      this.logger.error(
+        `Dispatch post ${postId} failed: ${err instanceof Error ? err.message : String(err)}`,
+      );
       throw err;
     }
   }

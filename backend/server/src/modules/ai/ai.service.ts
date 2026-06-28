@@ -1,11 +1,20 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { IsNull, Repository } from 'typeorm';
 import { Queue } from 'bullmq';
 import { Post, PostStatus } from '../../database/entities/post.entity';
 import { ContentPlan } from '../../database/entities/content-plan.entity';
-import { AiJob, AiJobType, AiJobStatus } from '../../database/entities/ai-job.entity';
+import {
+  AiJob,
+  AiJobType,
+  AiJobStatus,
+} from '../../database/entities/ai-job.entity';
 import { Business } from '../../database/entities/business.entity';
 import { Service } from '../../database/entities/service.entity';
 import { PostStateMachine } from './state-machine';
@@ -66,7 +75,10 @@ export class AiService {
       where: { id: dto.businessId, deletedAt: IsNull() },
     });
     if (!business) {
-      throw new NotFoundException({ message: 'Business not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Business not found',
+        error: 'not_found',
+      });
     }
 
     const plan = this.planRepo.create({
@@ -86,16 +98,27 @@ export class AiService {
     return this.planRepo.save(plan);
   }
 
-  async materialize(planId: string): Promise<{ plan: ContentPlan; post: Post }> {
+  async materialize(
+    planId: string,
+  ): Promise<{ plan: ContentPlan; post: Post }> {
     const plan = await this.planRepo.findOne({ where: { id: planId } });
     if (!plan) {
-      throw new NotFoundException({ message: 'Content plan not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Content plan not found',
+        error: 'not_found',
+      });
     }
     if (plan.status === 'materialized') {
-      throw new BadRequestException({ message: 'Plan already materialized', error: 'already_materialized' });
+      throw new BadRequestException({
+        message: 'Plan already materialized',
+        error: 'already_materialized',
+      });
     }
     if (plan.status === 'cancelled') {
-      throw new BadRequestException({ message: 'Plan cancelled', error: 'plan_cancelled' });
+      throw new BadRequestException({
+        message: 'Plan cancelled',
+        error: 'plan_cancelled',
+      });
     }
 
     const post = this.postRepo.create({
@@ -122,15 +145,24 @@ export class AiService {
   async captionCallback(dto: CaptionDto): Promise<Post> {
     const job = await this.jobRepo.findOne({ where: { id: dto.jobId } });
     if (!job) {
-      throw new NotFoundException({ message: 'AI job not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'AI job not found',
+        error: 'not_found',
+      });
     }
     if (job.type !== 'caption') {
-      throw new BadRequestException({ message: 'Job is not a caption job', error: 'wrong_job_type' });
+      throw new BadRequestException({
+        message: 'Job is not a caption job',
+        error: 'wrong_job_type',
+      });
     }
 
     const post = await this.postRepo.findOne({ where: { id: job.postId } });
     if (!post) {
-      throw new NotFoundException({ message: 'Post not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Post not found',
+        error: 'not_found',
+      });
     }
 
     post.caption = dto.caption;
@@ -150,15 +182,24 @@ export class AiService {
   async imageCallback(dto: ImageCallbackDto): Promise<Post> {
     const job = await this.jobRepo.findOne({ where: { id: dto.jobId } });
     if (!job) {
-      throw new NotFoundException({ message: 'AI job not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'AI job not found',
+        error: 'not_found',
+      });
     }
     if (job.type !== 'image') {
-      throw new BadRequestException({ message: 'Job is not an image job', error: 'wrong_job_type' });
+      throw new BadRequestException({
+        message: 'Job is not an image job',
+        error: 'wrong_job_type',
+      });
     }
 
     const post = await this.postRepo.findOne({ where: { id: job.postId } });
     if (!post) {
-      throw new NotFoundException({ message: 'Post not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Post not found',
+        error: 'not_found',
+      });
     }
 
     job.status = 'succeeded';
@@ -171,15 +212,24 @@ export class AiService {
   async shortVideoCallback(dto: ShortVideoCallbackDto): Promise<Post> {
     const job = await this.jobRepo.findOne({ where: { id: dto.jobId } });
     if (!job) {
-      throw new NotFoundException({ message: 'AI job not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'AI job not found',
+        error: 'not_found',
+      });
     }
     if (job.type !== 'short_video') {
-      throw new BadRequestException({ message: 'Job is not a short_video job', error: 'wrong_job_type' });
+      throw new BadRequestException({
+        message: 'Job is not a short_video job',
+        error: 'wrong_job_type',
+      });
     }
 
     const post = await this.postRepo.findOne({ where: { id: job.postId } });
     if (!post) {
-      throw new NotFoundException({ message: 'Post not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Post not found',
+        error: 'not_found',
+      });
     }
 
     job.status = 'succeeded';
@@ -192,7 +242,10 @@ export class AiService {
   async fail(dto: FailDto): Promise<AiJob> {
     const job = await this.jobRepo.findOne({ where: { id: dto.jobId } });
     if (!job) {
-      throw new NotFoundException({ message: 'AI job not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'AI job not found',
+        error: 'not_found',
+      });
     }
     job.attempts += 1;
     job.lastError = `${dto.errorCode}: ${dto.errorMessage}`;

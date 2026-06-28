@@ -48,7 +48,9 @@ export class Service {
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
   deletedAt: Date | null;
 
-  @ManyToOne(() => Business, (business) => business.services, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Business, (business) => business.services, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'business_id' })
   business: Business;
 

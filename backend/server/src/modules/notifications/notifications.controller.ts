@@ -1,4 +1,15 @@
-import { Body, Controller, Get, HttpCode, HttpStatus, Param, ParseUUIDPipe, Patch, Post, Query } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Patch,
+  Post,
+  Query,
+} from '@nestjs/common';
 import { NotificationsService } from './notifications.service';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
 import { NotificationType } from '../../database/entities/notification.entity';
@@ -21,14 +32,20 @@ export class NotificationsController {
   }
 
   @Get(':id')
-  async getOne(@CurrentUser('id') userId: string, @Param('id', new ParseUUIDPipe()) id: string) {
+  async getOne(
+    @CurrentUser('id') userId: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
     const n = await this.notificationsService.getOne(userId, id);
     return { notification: n };
   }
 
   @Patch(':id/read')
   @HttpCode(HttpStatus.OK)
-  async markRead(@CurrentUser('id') userId: string, @Param('id', new ParseUUIDPipe()) id: string) {
+  async markRead(
+    @CurrentUser('id') userId: string,
+    @Param('id', new ParseUUIDPipe()) id: string,
+  ) {
     const n = await this.notificationsService.markRead(userId, id);
     return { notification: n };
   }

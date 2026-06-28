@@ -20,17 +20,37 @@ export class EmailService {
   }
 
   enqueueVerifyEmail(userId: string, to: string, token: string): Promise<void> {
-    return this.enqueue({ template: 'verify-email', userId, to, payload: { token } });
+    return this.enqueue({
+      template: 'verify-email',
+      userId,
+      to,
+      payload: { token },
+    });
   }
 
-  enqueueResetPassword(userId: string, to: string, token: string): Promise<void> {
-    return this.enqueue({ template: 'reset-password', userId, to, payload: { token } });
+  enqueueResetPassword(
+    userId: string,
+    to: string,
+    token: string,
+  ): Promise<void> {
+    return this.enqueue({
+      template: 'reset-password',
+      userId,
+      to,
+      payload: { token },
+    });
   }
 
   enqueuePostReady(
     userId: string,
     to: string,
-    payload: { businessName: string; postId: string; caption: string; postType?: string | null; approvalDeadline?: string | null },
+    payload: {
+      businessName: string;
+      postId: string;
+      caption: string;
+      postType?: string | null;
+      approvalDeadline?: string | null;
+    },
   ): Promise<void> {
     return this.enqueue({ template: 'post-ready', userId, to, payload });
   }
@@ -38,7 +58,12 @@ export class EmailService {
   enqueuePostExpired(
     userId: string,
     to: string,
-    payload: { businessName: string; postId: string; caption: string; reason: 'user_rejected' | 'timeout' },
+    payload: {
+      businessName: string;
+      postId: string;
+      caption: string;
+      reason: 'user_rejected' | 'timeout';
+    },
   ): Promise<void> {
     return this.enqueue({ template: 'post-expired', userId, to, payload });
   }
@@ -46,7 +71,14 @@ export class EmailService {
   enqueuePostPosted(
     userId: string,
     to: string,
-    payload: { businessName: string; postId: string; caption: string; fbPostId: string; pageName: string; viewUrl?: string },
+    payload: {
+      businessName: string;
+      postId: string;
+      caption: string;
+      fbPostId: string;
+      pageName: string;
+      viewUrl?: string;
+    },
   ): Promise<void> {
     return this.enqueue({ template: 'post-posted', userId, to, payload });
   }
@@ -54,7 +86,13 @@ export class EmailService {
   enqueuePostFailed(
     userId: string,
     to: string,
-    payload: { businessName: string; postId: string; caption: string; errorCode: string; errorMessage: string },
+    payload: {
+      businessName: string;
+      postId: string;
+      caption: string;
+      errorCode: string;
+      errorMessage: string;
+    },
   ): Promise<void> {
     return this.enqueue({ template: 'post-failed', userId, to, payload });
   }

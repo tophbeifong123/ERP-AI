@@ -16,7 +16,14 @@ import { PostEventsModule } from '../posts/post-events.module';
 @Module({
   imports: [
     AuthConfigModule,
-    TypeOrmModule.forFeature([Post, ContentPlan, AiJob, Business, Service, User]),
+    TypeOrmModule.forFeature([
+      Post,
+      ContentPlan,
+      AiJob,
+      Business,
+      Service,
+      User,
+    ]),
     BullModule.registerQueueAsync({
       name: 'ai',
       imports: [ConfigModule],

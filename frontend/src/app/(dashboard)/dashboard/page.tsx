@@ -8,11 +8,14 @@ import {
   ThumbsUp, 
   MessageSquare, 
   Plus, 
-  ArrowUpRight 
+  ArrowUpRight,
+  Settings
 } from 'lucide-react';
+import { useRouter } from 'next/navigation';
 import { useBusinessStore } from '@/hooks/store/use-business-store';
 
 export default function DashboardPage() {
+  const router = useRouter();
   const { activeBusiness } = useBusinessStore();
 
   const stats = [
@@ -26,15 +29,24 @@ export default function DashboardPage() {
       {/* Header Block */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
         <div>
-          <h1 className="text-2xl font-extrabold text-white mb-1">ภาพรวมแดชบอร์ด</h1>
+          <h1 className="text-2xl font-extrabold text-foreground mb-1">ภาพรวมแดชบอร์ด</h1>
           <p className="text-xs text-muted-foreground">
-            วิเคราะห์และจัดการโพสต์ล่าสุดสำหรับแบรนด์: <span className="text-indigo-400 font-bold">{activeBusiness?.name}</span>
+            วิเคราะห์และจัดการโพสต์ล่าสุดสำหรับแบรนด์: <span className="text-primary font-bold">{activeBusiness?.name}</span>
           </p>
         </div>
-        <button className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-xs font-bold text-white shadow shadow-primary/20 transition cursor-pointer">
-          <Plus className="w-4 h-4" />
-          สร้างโพสต์ด่วน (AI)
-        </button>
+        <div className="flex items-center gap-2">
+          <button 
+            onClick={() => router.push('/settings')}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-secondary hover:bg-secondary/80 border border-border text-xs font-bold text-foreground transition cursor-pointer"
+          >
+            <Settings className="w-4 h-4 text-muted-foreground" />
+            ตั้งค่าธุรกิจ
+          </button>
+          <button className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-xs font-bold text-white shadow shadow-primary/20 transition cursor-pointer">
+            <Plus className="w-4 h-4" />
+            สร้างโพสต์ด่วน (AI)
+          </button>
+        </div>
       </div>
 
       {/* Grid Quick Stats Cards */}
@@ -45,12 +57,12 @@ export default function DashboardPage() {
             <div key={idx} className="glass-panel glow-indigo rounded-xl p-5 flex items-center justify-between">
               <div className="space-y-2">
                 <span className="text-xxs font-bold text-muted-foreground uppercase tracking-wider block">{stat.name}</span>
-                <span className="text-xl font-extrabold text-white block">{stat.value}</span>
-                <span className="inline-flex items-center text-xxs text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">
+                <span className="text-xl font-extrabold text-foreground block">{stat.value}</span>
+                <span className="inline-flex items-center text-xxs text-emerald-500 dark:text-emerald-400 font-bold bg-emerald-500/10 px-1.5 py-0.5 rounded">
                   {stat.change}
                 </span>
               </div>
-              <div className="w-10 h-10 rounded-lg bg-indigo-500/5 border border-indigo-500/10 flex items-center justify-center text-indigo-400">
+              <div className="w-10 h-10 rounded-lg bg-primary/5 border border-primary/10 flex items-center justify-center text-primary">
                 <Icon className="w-5 h-5" />
               </div>
             </div>
@@ -64,16 +76,16 @@ export default function DashboardPage() {
         {/* Left Side: Recent AI Posts */}
         <div className="lg:col-span-2 glass-panel rounded-xl p-5 space-y-4">
           <div className="flex justify-between items-center">
-            <h2 className="text-sm font-extrabold text-white">โพสต์ล่าสุดของ AI</h2>
-            <button className="text-xxs text-indigo-400 hover:text-indigo-300 font-bold flex items-center gap-0.5">
+            <h2 className="text-sm font-extrabold text-foreground">โพสต์ล่าสุดของ AI</h2>
+            <button className="text-xxs text-primary hover:text-primary/80 font-bold flex items-center gap-0.5 cursor-pointer">
               ดูทั้งหมด <ArrowUpRight className="w-3 h-3" />
             </button>
           </div>
           
-          <div className="flex flex-col items-center justify-center p-10 text-center gap-3 border border-dashed border-white/5 rounded-lg bg-neutral-900/10">
+          <div className="flex flex-col items-center justify-center p-10 text-center gap-3 border border-dashed border-border rounded-lg bg-muted/20">
             <Building className="w-8 h-8 text-muted-foreground" />
             <div>
-              <span className="block text-xs font-semibold text-white">ยังไม่มีคิวโพสต์ที่อนุมัติ</span>
+              <span className="block text-xs font-semibold text-foreground">ยังไม่มีคิวโพสต์ที่อนุมัติ</span>
               <span className="block text-xxs text-muted-foreground max-w-xs mt-1 leading-normal">
                 AI จะแนะนำ Content Plan โพสต์แรกสำหรับการตลาดของคุณในวันพรุ่งนี้ เวลา 06:00 น.
               </span>
@@ -83,33 +95,33 @@ export default function DashboardPage() {
 
         {/* Right Side: Active Channel Connections */}
         <div className="glass-panel rounded-xl p-5 space-y-4">
-          <h2 className="text-sm font-extrabold text-white">ช่องทางสื่อที่ผูกสิทธิ์</h2>
+          <h2 className="text-sm font-extrabold text-foreground">ช่องทางสื่อที่ผูกสิทธิ์</h2>
           
           <div className="space-y-3">
-            <div className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-neutral-900/20">
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/35">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-indigo-500/10 border border-indigo-500/20 flex items-center justify-center text-indigo-400 font-extrabold text-xs">
+                <div className="w-8 h-8 rounded-full bg-primary/10 border border-primary/20 flex items-center justify-center text-primary font-extrabold text-xs">
                   f
                 </div>
                 <div>
-                  <span className="block text-xs font-bold text-white">Facebook Page</span>
+                  <span className="block text-xs font-bold text-foreground">Facebook Page</span>
                   <span className="block text-xxs text-muted-foreground">เชื่อมต่ออยู่</span>
                 </div>
               </div>
-              <span className="w-2 h-2 rounded-full bg-emerald-400 block" />
+              <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 block" />
             </div>
 
-            <div className="flex items-center justify-between p-3 rounded-lg border border-white/5 bg-neutral-900/20 opacity-50">
+            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/35 opacity-50">
               <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center text-green-400 font-extrabold text-xs">
+                <div className="w-8 h-8 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center text-green-600 dark:text-green-400 font-extrabold text-xs">
                   L
                 </div>
                 <div>
-                  <span className="block text-xs font-bold text-white">LINE Official Account</span>
+                  <span className="block text-xs font-bold text-foreground">LINE Official Account</span>
                   <span className="block text-xxs text-muted-foreground">ยังไม่เชื่อมต่อ</span>
                 </div>
               </div>
-              <span className="w-2 h-2 rounded-full bg-neutral-600 block" />
+              <span className="w-2 h-2 rounded-full bg-muted-foreground block" />
             </div>
           </div>
         </div>

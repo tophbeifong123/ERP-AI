@@ -19,7 +19,12 @@ import { AuthConfigModule } from './auth-config.module';
   imports: [
     AuthConfigModule,
     EmailModule,
-    TypeOrmModule.forFeature([User, RefreshToken, EmailVerification, PasswordReset]),
+    TypeOrmModule.forFeature([
+      User,
+      RefreshToken,
+      EmailVerification,
+      PasswordReset,
+    ]),
   ],
   controllers: [AuthController],
   providers: [

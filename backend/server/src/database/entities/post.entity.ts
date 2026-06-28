@@ -25,7 +25,11 @@ export type PostStatus =
   | 'expired'
   | 'failed';
 
-export type PostType = 'promotion' | 'product_showcase' | 'brand_awareness' | 'event';
+export type PostType =
+  | 'promotion'
+  | 'product_showcase'
+  | 'brand_awareness'
+  | 'event';
 export type GenerationSource = 'auto_ai' | 'fixed_schedule' | 'manual';
 export type RejectionReason = 'user_rejected' | 'timeout';
 
@@ -86,7 +90,9 @@ export class Post {
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
   deletedAt: Date | null;
 
-  @ManyToOne(() => Business, (business) => business.posts, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Business, (business) => business.posts, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'business_id' })
   business: Business;
 
