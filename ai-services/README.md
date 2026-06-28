@@ -134,12 +134,26 @@ venv\Scripts\uvicorn app.main:app --reload
 
 ### Callback (AI → backend)
 
+request มีฟิลด์ `mediaType` = `"image"` หรือ `"short_video"` (backend เป็นผู้กำหนด)
+
 ```json
 {
   "jobId": "7f8e9d0c-...",
   "result": {
     "caption": "ศุกร์นี้พบกับโปรสุดคุ้ม! 🍜 ... #กาแฟสด #ดอยช้าง",
-    "mediaPrompt": "A warm photo of iced latte and Americano on a wooden table, cozy coffee shop, soft natural light, no text"
+    "mediaRequest": {
+      "content_type": "short_video",
+      "aspect_ratio": "9:16",
+      "style": "cinematic_fantasy",
+      "negative_prompt": "blurry, low quality, text, logo, watermark",
+      "scenes": [
+        { "prompt": "Scene 1: English visual description ..." },
+        { "prompt": "Scene 2: ..." },
+        { "prompt": "Scene 3: ..." },
+        { "prompt": "Scene 4: ..." }
+      ],
+      "metadata": { "campaign_id": "post-id" }
+    }
   }
 }
 ```
@@ -148,13 +162,18 @@ venv\Scripts\uvicorn app.main:app --reload
 (แนะนำ 100–500 ตัวอักษร) กรณีเกิดข้อผิดพลาด:
 `{ "jobId": "...", "error": { "code": "model_error", "message": "..." } }`
 
-> **`mediaPrompt` (ภาษาอังกฤษ):** prompt บรรยายภาพ/วิดีโอสำหรับ AI Media ที่สร้างให้
-> สอดคล้องกับแคปชั่น + การตัดสินใจ (ไม่ใช่การแปลแคปชั่น) เพื่อให้ภาพที่ได้ตรงกับโพสต์
-> ⚠️ ฟิลด์นี้เป็นส่วนขยายของ contract — ต้องตกลงกับทีม backend + AI Media ว่าจะส่ง
-> `mediaPrompt` ต่อไปยัง AI Media อย่างไร (ดู `docs/contracts/AI-MEDIA.md`)
+> **`mediaRequest` (scene prompts ภาษาอังกฤษ):** payload สำหรับ AI Media ในรูปแบบของ
+> AI Media เอง (snake_case). `content_type` มาจาก `mediaType` ใน request:
+> `image` → 1 scene, `aspect_ratio` `5:4`; `short_video` → 4 scenes (ฉากละ ~8 วินาที,
+> ต่อเนื่องเป็นเรื่องเดียว), `aspect_ratio` `9:16`
+>
+> ⚠️ **ต้องยืนยันกับทีม:** (1) backend ต้องเติม `callback_url` ก่อนส่งต่อให้ AI Media;
+> (2) ค่า `style` ที่ใช้ได้มีอะไรบ้าง (ตอนนี้ default `cinematic_fantasy`);
+> (3) โครงสร้างนี้ยังไม่ตรงกับ `docs/contracts/AI-MEDIA.md` เดิม — ใช้ตามที่ทีม AI Media
+> กำหนดล่าสุด
 
-> **เรื่องสื่อ (Media):** เซอร์วิสนี้ **ไม่ได้** เรียก AI Media เอง เราเพียงสร้าง `mediaPrompt`
-> ให้ ส่วน backend จะเป็นผู้ส่งต่อไปยัง AI Media เพื่อสร้างรูป/วิดีโอ
+> **เรื่องสื่อ (Media):** เซอร์วิสนี้ **ไม่ได้** เรียก AI Media เอง เราเพียงสร้าง `mediaRequest`
+> ให้ ส่วน backend จะเป็นผู้ส่งต่อ (พร้อมเติม `callback_url`) ไปยัง AI Media
 
 ---
 

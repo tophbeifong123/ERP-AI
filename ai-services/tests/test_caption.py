@@ -70,42 +70,64 @@ def test_strips_code_fences(monkeypatch):
     assert result.caption == "สวัสดี 🍵 #กาแฟ"
 
 
-def test_generates_english_media_prompt(monkeypatch):
-    """The model returns caption + mediaPrompt; both must be parsed."""
+def test_image_media_request_single_scene(monkeypatch):
+    """media_type=image -> content_type image, 5:4, exactly 1 scene."""
     fake = json.dumps({
         "caption": "อร่อยมาก! #อาหาร",
-        "mediaPrompt": "A photorealistic bowl of Thai tom yum noodles, fresh shrimp, "
-                       "steam rising, warm restaurant lighting, no text",
+        "scenes": ["A photorealistic bowl of Thai tom yum, fresh shrimp, warm light, no text"],
     })
     monkeypatch.setattr(caption_service.client.chat.completions, "create", _fake_groq(fake))
 
-    result = caption_service.build_caption(_request())
-    assert result.caption == "อร่อยมาก! #อาหาร"
-    assert result.media_prompt.startswith("A photorealistic")
+    result = caption_service.build_caption(_request(media_type="image"))
+    mr = result.media_request
+    assert mr.content_type == "image"
+    assert mr.aspect_ratio == "5:4"
+    assert len(mr.scenes) == 1
+    assert mr.scenes[0].prompt.startswith("A photorealistic")
+    assert mr.negative_prompt == caption_service.NEGATIVE_PROMPT
 
 
-def test_media_prompt_optional_when_absent(monkeypatch):
-    """If the model omits mediaPrompt, we still succeed with None."""
+def test_video_media_request_four_scenes(monkeypatch):
+    """media_type=short_video -> content_type short_video, 9:16, capped at 4 scenes."""
+    fake = json.dumps({
+        "caption": "ดูคลิป! #โปร",
+        "scenes": [f"English scene {i}" for i in range(1, 7)],  # model over-produces 6
+    })
+    monkeypatch.setattr(caption_service.client.chat.completions, "create", _fake_groq(fake))
+
+    result = caption_service.build_caption(_request(media_type="short_video"))
+    mr = result.media_request
+    assert mr.content_type == "short_video"
+    assert mr.aspect_ratio == "9:16"
+    assert len(mr.scenes) == caption_service.VIDEO_SCENE_COUNT  # capped to 4
+
+
+def test_media_request_absent_when_no_scenes(monkeypatch):
+    """If the model omits scenes, we still succeed with media_request None."""
     monkeypatch.setattr(caption_service.client.chat.completions, "create",
                         _fake_groq(json.dumps({"caption": "hi"})))
     result = caption_service.build_caption(_request())
-    assert result.media_prompt is None
+    assert result.media_request is None
 
 
-def test_process_caption_posts_camelcase_callback(monkeypatch):
+def test_process_caption_callback_has_snakecase_media_request(monkeypatch):
+    """Envelope is camelCase; the mediaRequest CONTENTS stay snake_case for AI Media."""
     captured = {}
     monkeypatch.setattr(caption_service, "post_callback",
                         lambda url, payload: captured.update(url=url, payload=payload))
     monkeypatch.setattr(caption_service.client.chat.completions, "create",
                         _fake_groq(json.dumps({"caption": "โพสต์ทดสอบ #ทดสอบ",
-                                               "mediaPrompt": "A cozy cafe scene, no text"})))
+                                               "scenes": ["A cozy cafe scene, no text"]})))
 
-    caption_service.process_caption(_request())
+    caption_service.process_caption(_request(media_type="image"))
 
+    result = captured["payload"]["result"]
     assert captured["payload"]["jobId"] == "job-123"
-    assert captured["payload"]["result"]["caption"] == "โพสต์ทดสอบ #ทดสอบ"
-    # English media prompt is delivered under the camelCase key
-    assert captured["payload"]["result"]["mediaPrompt"] == "A cozy cafe scene, no text"
+    assert result["caption"] == "โพสต์ทดสอบ #ทดสอบ"
+    mr = result["mediaRequest"]            # camelCase envelope key
+    assert mr["content_type"] == "image"   # snake_case AI Media contents
+    assert mr["scenes"][0]["prompt"] == "A cozy cafe scene, no text"
+    assert mr["metadata"]["campaign_id"] == "post-123"
 
 
 def test_process_caption_sends_error_callback_on_failure(monkeypatch):

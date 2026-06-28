@@ -150,6 +150,7 @@ def test_caption_roundtrip_with_groq(client: TestClient):
         ],
         "captionHint": "โปรวันศุกร์",
         "targetAudience": "คนรุ่นใหม่",
+        "mediaType": "short_video",
     }
     r = client.post("/api/ai/caption/generate", json=payload,
                     headers={"X-Internal-Token": TOKEN})
@@ -162,11 +163,17 @@ def test_caption_roundtrip_with_groq(client: TestClient):
     body = received[0]["body"] or {}
     result = body.get("result", {})
     caption = result.get("caption", "")
-    media_prompt = result.get("mediaPrompt", "")
+    mr = result.get("mediaRequest") or {}
+    scenes = mr.get("scenes", [])
     check("Callback has jobId + result.caption", body.get("jobId") == "job-e2e-1" and bool(caption))
-    check("Callback has English result.mediaPrompt", bool(media_prompt) and media_prompt.isascii())
+    check("mediaRequest content_type is short_video", mr.get("content_type") == "short_video")
+    check("mediaRequest has 4 scenes", len(scenes) == 4)
+    check("Scene prompts are English", bool(scenes) and all(s["prompt"].isascii() for s in scenes))
     print(f"\n  Generated caption:\n  {caption}\n")
-    print(f"  Generated mediaPrompt (English):\n  {media_prompt}\n")
+    print("  Generated scenes (English):")
+    for i, s in enumerate(scenes, 1):
+        print(f"   {i}. {s['prompt']}")
+    print()
 
 
 def main():

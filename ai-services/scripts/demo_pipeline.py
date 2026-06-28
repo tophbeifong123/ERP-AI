@@ -81,6 +81,7 @@ def main():
         featured_services=featured,
         caption_hint=decision.caption_hint,
         target_audience=business.target_audience,
+        media_type="short_video",  # backend would set this; shows the 4-scene flow
     )
 
     # --- STEP 2: Caption ---

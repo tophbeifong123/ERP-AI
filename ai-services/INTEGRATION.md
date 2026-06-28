@@ -44,15 +44,23 @@ X-Internal-Token: <INTERNAL_TOKEN>
 ```
 (เมื่อ `shouldPost` เป็น false: ส่งเฉพาะ `shouldPost` + `reasoning`)
 
-**Callback ของ Caption:**
+**Callback ของ Caption:** (request ต้องมี `mediaType` = `image` หรือ `short_video`)
 ```json
 { "jobId": "...", "result": {
     "caption": "…แคปชั่นภาษาไทยฉบับเต็มพร้อม #hashtag…",
-    "mediaPrompt": "English visual prompt for AI Media (image/short video)" } }
+    "mediaRequest": {
+      "content_type": "short_video",     // หรือ "image"
+      "aspect_ratio": "9:16",            // image = "5:4"
+      "style": "cinematic_fantasy",
+      "negative_prompt": "blurry, low quality, text, logo, watermark",
+      "scenes": [ { "prompt": "English scene 1" }, ... ],   // video=4, image=1
+      "metadata": { "campaign_id": "<postId>" }
+    } } }
 ```
-> `mediaPrompt` เป็น **ภาษาอังกฤษ** สำหรับส่งต่อให้ AI Media สร้างภาพ/วิดีโอ ให้ตรงกับ
-> แคปชั่น + การตัดสินใจ ⚠️ เป็นฟิลด์ที่เพิ่มเข้ามา ต้องตกลงกับทีม AI Media ว่าจะรับ
-> `mediaPrompt` ทาง request ของ `/generate/image` และ `/generate/short_video` อย่างไร
+> `mediaRequest` คือ payload สำหรับ AI Media โดยตรง (snake_case) scene prompts เป็น
+> **ภาษาอังกฤษ** video = 4 ฉาก (ฉากละ ~8 วินาที), image = 1 ฉาก
+> ⚠️ **backend ต้องเติม `callback_url`** ของ AI Media ก่อนส่งต่อ และต้องยืนยันค่า `style`
+> ที่ใช้ได้กับทีม AI Media (default `cinematic_fantasy`)
 
 **Callback กรณีข้อผิดพลาด (ทั้งสองเซอร์วิส):**
 ```json
