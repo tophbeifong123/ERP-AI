@@ -14,7 +14,7 @@ import {
   X,
   Loader2,
   Calendar,
-  Facebook
+  Globe
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useBusinessStore } from '@/hooks/store/use-business-store';
@@ -290,7 +290,7 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/35 gap-2">
                 <div className="flex items-center gap-2.5">
                   <div className="w-8 h-8 rounded-full bg-muted border border-border flex items-center justify-center text-muted-foreground">
-                    <Facebook className="w-4 h-4" />
+                    <Globe className="w-4 h-4" />
                   </div>
                   <div>
                     <span className="block text-xs font-bold text-foreground">เพจ Facebook</span>
