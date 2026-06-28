@@ -1,0 +1,134 @@
+import {
+  BadRequestException,
+  Body,
+  Controller,
+  Delete,
+  Get,
+  HttpCode,
+  HttpStatus,
+  Param,
+  ParseUUIDPipe,
+  Post,
+  Query,
+  Res,
+  UploadedFile,
+  UseGuards,
+  UseInterceptors,
+} from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
+import type { Response } from 'express';
+import { FacebookService } from './facebook.service';
+import { ConnectPageDto } from './dto/connect-page.dto';
+import { Public } from '../../common/decorators/public.decorator';
+import { CurrentUser } from '../../common/decorators/current-user.decorator';
+import { EmailVerifiedGuard } from '../../common/guards/email-verified.guard';
+import { OwnerGuard } from '../../common/guards/owner.guard';
+import { ResourceType } from '../../common/decorators/resource-type.decorator';
+
+@Controller('facebook')
+export class FacebookController {
+  constructor(private facebookService: FacebookService) {}
+
+  @Get('oauth/start')
+  async start(
+    @Query('businessId') businessId: string,
+    @CurrentUser('id') userId: string,
+    @Res() res: Response,
+  ) {
+    if (!businessId) {
+      return res.status(400).json({ message: 'businessId is required', error: 'bad_request' });
+    }
+    const url = await this.facebookService.buildOAuthUrl(userId, businessId);
+    return res.redirect(url);
+  }
+
+  @Public()
+  @Get('oauth/callback')
+  async callback(
+    @Query('code') code: string,
+    @Query('state') state: string,
+    @Res() res: Response,
+  ) {
+    const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
+    if (!code || !state) {
+      return res.redirect(`${frontendUrl}/businesses?fb=missing_params`);
+    }
+    try {
+      const { businessId } = await this.facebookService.handleCallback(code, state);
+      return res.redirect(`${frontendUrl}/businesses/${businessId}?fb=connected`);
+    } catch (err) {
+      const msg = err instanceof Error ? err.message : 'callback_failed';
+      return res.redirect(`${frontendUrl}/businesses?fb=error&msg=${encodeURIComponent(msg)}`);
+    }
+  }
+
+  @Get('pages')
+  @UseGuards(EmailVerifiedGuard)
+  async listPages(
+    @Query('businessId', new ParseUUIDPipe()) businessId: string,
+    @CurrentUser('id') userId: string,
+  ) {
+    const pages = await this.facebookService.listPagesForUser(userId, businessId);
+    return { pages };
+  }
+
+  @Post('businesses/:id/facebook-pages')
+  @UseGuards(EmailVerifiedGuard, OwnerGuard)
+  @ResourceType('business')
+  @HttpCode(HttpStatus.CREATED)
+  async connect(
+    @Param('id', new ParseUUIDPipe()) businessId: string,
+    @CurrentUser('id') userId: string,
+    @Body() dto: ConnectPageDto,
+  ) {
+    const facebookPage = await this.facebookService.connectPage(userId, businessId, dto.fbPageId);
+    return { facebookPage };
+  }
+
+  @Delete('businesses/:id/facebook-pages/:pageId')
+  @UseGuards(EmailVerifiedGuard, OwnerGuard)
+  @ResourceType('business')
+  @HttpCode(HttpStatus.NO_CONTENT)
+  async disconnect(
+    @Param('id', new ParseUUIDPipe()) businessId: string,
+    @Param('pageId', new ParseUUIDPipe()) pageId: string,
+  ) {
+    await this.facebookService.disconnectPage(businessId, pageId);
+    return;
+  }
+
+  @Public()
+  @Post('test-post')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const ok = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.mimetype);
+        cb(ok ? null : new BadRequestException('invalid_file_type'), ok);
+      },
+    }),
+  )
+  async testPost(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('caption') caption: string,
+    @Body('fbPageId') fbPageId: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException({ message: 'file_required', error: 'bad_request' });
+    }
+    if (!caption) {
+      throw new BadRequestException({ message: 'caption_required', error: 'bad_request' });
+    }
+    if (!fbPageId) {
+      throw new BadRequestException({ message: 'fbPageId_required', error: 'bad_request' });
+    }
+    const result = await this.facebookService.testPostToPage(fbPageId, caption, {
+      buffer: file.buffer,
+      mime: file.mimetype,
+      originalName: file.originalname,
+    });
+    return result;
+  }
+}
