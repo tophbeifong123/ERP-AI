@@ -65,7 +65,7 @@ export default function HomePage() {
   }, [router, setAuth, clearAuth]);
 
   return (
-    <div className="relative min-h-screen flex flex-col items-center justify-center bg-neutral-950 font-sans">
+    <div className="relative min-h-screen flex flex-col items-center justify-center bg-background font-sans">
       {/* Background Decorative Lighting */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-indigo-600/5 blur-[100px] pointer-events-none" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-500/5 blur-[100px] pointer-events-none" />
