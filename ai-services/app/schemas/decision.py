@@ -23,7 +23,7 @@ class ServiceInfo(CamelModel):
     id: str
     name: str
     description: str | None = None
-    price: int | None = None          # satang (6000 = 60.00 THB)
+    price_minor: int | None = None    # -> priceMinor; satang (6000 = 60.00 THB)
     currency: str | None = None
     is_active: bool = True
 
@@ -44,9 +44,6 @@ class BusinessContext(CamelModel):
 class RecentPost(CamelModel):
     posted_at: datetime
     post_type: str
-    # Optional: lets the AI apply the "not featured in last 3 posts" rule.
-    # Pending confirmation that the backend will populate it.
-    featured_service_ids: list[str] = []
 
 
 # ---- Incoming request (backend -> AI) ----
@@ -60,6 +57,8 @@ class DecisionRequest(CamelModel):
     last_post_at: datetime | None = None
     now_iso: datetime | None = None
     services: list[ServiceInfo] = []
+    # Service IDs featured in recent posts -> lets the AI avoid repeating them.
+    recent_featured_service_ids: list[str] = []
 
 
 # ---- Outgoing callback (AI -> backend callbackUrl) ----

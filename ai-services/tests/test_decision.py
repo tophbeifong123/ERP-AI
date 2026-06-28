@@ -26,7 +26,7 @@ def _request(**overrides) -> DecisionRequest:
         posts_this_week=0,
         last_post_at=None,
         now_iso=datetime(2026, 6, 28, 10, 0, tzinfo=timezone.utc),
-        services=[ServiceInfo(id="svc-1", name="Latte", price=6500, currency="THB")],
+        services=[ServiceInfo(id="svc-1", name="Latte", price_minor=6500, currency="THB")],
     )
     data.update(overrides)
     return DecisionRequest(**data)

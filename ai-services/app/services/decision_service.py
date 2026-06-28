@@ -21,12 +21,17 @@ def _build_prompt(req: DecisionRequest, now: datetime) -> str:
     if req.services:
         services_text = "\n".join(
             f"  - id: {s.id} | {s.name} | {s.description or 'N/A'}"
-            + (f" | {s.price / 100:.0f} {s.currency or 'THB'}" if s.price else "")
+            + (f" | {s.price_minor / 100:.0f} {s.currency or 'THB'}" if s.price_minor else "")
             + (" | INACTIVE" if not s.is_active else "")
             for s in req.services
         )
     else:
         services_text = "  No services provided"
+
+    recently_featured = (
+        ", ".join(req.recent_featured_service_ids)
+        if req.recent_featured_service_ids else "none"
+    )
 
     recent_text = "\n".join(
         f"  - {p.posted_at.strftime('%Y-%m-%d')} ({p.post_type})" for p in req.recent_posts
@@ -61,7 +66,8 @@ Decide whether the business should post on Facebook today.
 
 ## Your Task
 Decide if the business should post today. Pick 1-3 featured services that are
-active, match the post type, and were not featured in recent posts.
+active, match the post type, and were NOT recently featured.
+Recently featured service ids (avoid these): {recently_featured}
 
 Respond in this exact JSON format (no other text):
 {{

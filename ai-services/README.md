@@ -73,13 +73,16 @@ Docs: <http://localhost:8000/docs> · Health: `GET /health`
   "lastPostAt": "2026-06-24T13:00:00Z",
   "nowIso": "2026-06-28T06:00:00Z",
   "services": [
-    { "id": "svc-1", "name": "ลาเต้เย็น", "price": 6500, "currency": "THB", "isActive": true }
-  ]
+    { "id": "svc-1", "name": "ลาเต้เย็น", "priceMinor": 6500, "currency": "THB", "isActive": true }
+  ],
+  "recentFeaturedServiceIds": ["svc-9"]
 }
 ```
 
 > `services[]` is sent by the backend (Option 1) so the AI can pick `featuredServiceIds`.
-> `price` is in **satang** (6500 = 65.00 THB).
+> `priceMinor` is in **satang** (6500 = 65.00 THB). `recentFeaturedServiceIds` lists
+> services already featured recently, so the AI avoids repeating them.
+> ⚠️ Field name differs from Caption: Decision uses `priceMinor`, Caption uses `price`.
 
 ### Callback (AI → backend)
 

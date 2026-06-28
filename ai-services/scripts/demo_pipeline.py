@@ -18,7 +18,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 from app.schemas.decision import (
     DecisionRequest, BusinessContext, RecentPost, ServiceInfo, DecisionCallback,
 )
-from app.schemas.caption import CaptionRequest, CaptionCallback
+from app.schemas.caption import CaptionRequest, CaptionCallback, FeaturedService
 from app.services.decision_service import build_decision
 from app.services.caption_service import build_caption
 
@@ -40,8 +40,8 @@ def main():
         min_gap_days=1,
     )
     catalogue = [
-        ServiceInfo(id="svc-1", name="ลาเต้เย็น", description="กาแฟนมเย็น", price=6500, currency="THB"),
-        ServiceInfo(id="svc-2", name="อเมริกาโน่", description="กาแฟดำ", price=5500, currency="THB"),
+        ServiceInfo(id="svc-1", name="ลาเต้เย็น", description="กาแฟนมเย็น", price_minor=6500, currency="THB"),
+        ServiceInfo(id="svc-2", name="อเมริกาโน่", description="กาแฟดำ", price_minor=5500, currency="THB"),
     ]
 
     # --- STEP 1: Decision ---
@@ -64,8 +64,13 @@ def main():
         print("\nDecision says DO NOT post. Backend would stop here.")
         return
 
-    # --- Glue: backend maps featuredServiceIds -> full services for caption ---
-    featured = [s for s in catalogue if s.id in decision.featured_service_ids]
+    # --- Glue: backend maps featuredServiceIds -> caption's FeaturedService.
+    # Note the price field rename: decision priceMinor -> caption price. ---
+    featured = [
+        FeaturedService(id=s.id, name=s.name, description=s.description,
+                        price=s.price_minor, currency=s.currency)
+        for s in catalogue if s.id in decision.featured_service_ids
+    ]
 
     caption_req = CaptionRequest(
         callback_url="https://api.example.com/internal/ai/caption/callback",
