@@ -32,7 +32,6 @@ import {
   DropdownMenu, 
   DropdownMenuContent, 
   DropdownMenuItem, 
-  DropdownMenuLabel, 
   DropdownMenuSeparator, 
   DropdownMenuTrigger 
 } from '@/components/ui/dropdown-menu';
@@ -149,9 +148,9 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
               <ChevronDown className="w-3.5 h-3.5 text-muted-foreground shrink-0" />
             </DropdownMenuTrigger>
             <DropdownMenuContent align="start" className="w-[220px] bg-neutral-950 border border-white/10 text-white">
-              <DropdownMenuLabel className="text-xxs text-muted-foreground font-bold px-2 py-1.5">
+              <div className="text-xxs text-muted-foreground font-bold px-2 py-1.5 select-none">
                 เลือกธุรกิจที่จะใช้งาน
-              </DropdownMenuLabel>
+              </div>
               <DropdownMenuSeparator className="bg-white/5" />
               {businesses.map((biz) => (
                 <DropdownMenuItem
