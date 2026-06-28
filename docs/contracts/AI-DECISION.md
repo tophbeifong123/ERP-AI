@@ -61,6 +61,24 @@ X-Request-Id: <uuid>           (optional — สำหรับ debug)
     "minGapDays": 1,
     "logoPublicUrl": "https://cdn.example.com/logos/abc.png"
   },
+  "services": [
+    {
+      "id": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
+      "name": "ก๋วยเตี๋ยวต้มยำ",
+      "description": "ต้มยำรสจัด เส้นเหนียวนุ่ม ใส่กุ้งสด",
+      "priceMinor": 6000,
+      "currency": "THB",
+      "isActive": true
+    },
+    {
+      "id": "c2d3e4f5-a6b7-4c8d-9e0f-1a2b3c4d5e6f",
+      "name": "ข้าวผัดปู",
+      "description": "ข้าวผัดปูเนื้อแน่น หอมกระเทียม",
+      "priceMinor": 12000,
+      "currency": "THB",
+      "isActive": true
+    }
+  ],
   "recentPosts": [
     {
       "postedAt": "2026-06-22T11:30:00.000Z",
@@ -70,6 +88,9 @@ X-Request-Id: <uuid>           (optional — สำหรับ debug)
       "postedAt": "2026-06-24T13:00:00.000Z",
       "postType": "promotion"
     }
+  ],
+  "recentFeaturedServiceIds": [
+    "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e"
   ],
   "postsThisWeek": 2,
   "lastPostAt": "2026-06-24T13:00:00.000Z",
@@ -93,9 +114,17 @@ X-Request-Id: <uuid>           (optional — สำหรับ debug)
 | `business.postsPerWeekTarget` | int | ✅ | เป้าหมวนโพสต์ต่อสัปดาห์ (1-14) |
 | `business.minGapDays` | int | ✅ | ระยะห่างขั้นต่ำระหว่างโพสต์ (0-7 วัน) |
 | `business.logoPublicUrl` | string | ❌ | URL โลโก้ (public) |
+| `services` | object[] | ✅ | รายการ service ทั้งหมดที่ active อยู่ของธุรกิจนี้ (อาจว่างได้ถ้ายังไม่มี) |
+| `services[].id` | uuid | ✅ | Service ID |
+| `services[].name` | string | ✅ | ชื่อบริการ |
+| `services[].description` | string | ❌ | คำอธิบาย |
+| `services[].priceMinor` | bigint | ❌ | ราคา (สตางค์ เช่น 6000 = 60 บาท) |
+| `services[].currency` | string | ❌ | "THB" |
+| `services[].isActive` | bool | ✅ | ใช้งานอยู่หรือไม่ |
 | `recentPosts` | object[] | ✅ | โพสต์ 14 วันล่าสุด (อาจว่างได้) |
 | `recentPosts[].postedAt` | ISODateTime | ✅ | เวลาโพสต์ (UTC) |
 | `recentPosts[].postType` | string | ✅ | ประเภทโพสต์ |
+| `recentFeaturedServiceIds` | uuid[] | ✅ | UUID ของ services ที่ถูก featured ในโพสต์ 3 รายการล่าสุด (อาจว่างได้) |
 | `postsThisWeek` | int | ✅ | จำนวนโพสต์ในสัปดาห์นี้ (เริ่มจันทร์ 00:00 Asia/Bangkok) |
 | `lastPostAt` | ISODateTime | ❌ | เวลาโพสต์ล่าสุด (null = ยังไม่เคยโพสต์) |
 | `nowIso` | ISODateTime | ✅ | เวลาปัจจุบัน (UTC) |
@@ -223,10 +252,13 @@ X-Internal-Token: <shared secret เดียวกัน>
 
 ### 4.4 เกณฑ์การเลือก `featuredServiceIds`
 
-- เลือก 1-3 service ที่:
-  - `isActive = true`
-  - ยังไม่ถูก featured ในโพสต์ 3 รายการล่าสุด
-  - ตรงกับ `postType` ที่เลือก
+AI จะเลือก UUID จาก `services` array ที่ได้รับใน request โดยใช้เกณฑ์:
+- `isActive = true`
+- `id` **ไม่อยู่** ใน `recentFeaturedServiceIds` (กันซ้ำกับโพสต์ 3 ล่าสุด)
+- `name` หรือ `description` ตรงกับ `postType` ที่เลือก (เช่น `postType=promotion` → เลือก service ที่มีคำว่า "โปรโมชัน" / "ลดราคา")
+- ถ้าไม่มี service ที่ตรงเกณฑ์ → return `featuredServiceIds = []` (โพสต์ได้แต่ไม่มี featured)
+
+**UUID ที่ return ใน `featuredServiceIds` ต้องตรงกับ `services[].id` ใน request เท่านั้น** (ห้าม return UUID ที่ไม่มีใน list)
 
 ---
 
@@ -257,18 +289,29 @@ curl -X POST https://ai-decision.example.com/decide \
       "tone": "เป็นกันเอง อบอุ่น",
       "keywords": ["ก๋วยเตี๋ยว", "ต้มยำ"],
       "targetAudience": "คนทำงานออฟฟิศ 25-45 ปี ในย่านลาดพร้าว",
-      "postsPerWeekTarget": 3,
-      "minGapDays": 1,
-      "logoPublicUrl": "https://cdn.example.com/logos/abc.png"
-    },
-    "recentPosts": [
-      {"postedAt": "2026-06-22T11:30:00.000Z", "postType": "product_showcase"},
-      {"postedAt": "2026-06-24T13:00:00.000Z", "postType": "promotion"}
-    ],
-    "postsThisWeek": 2,
-    "lastPostAt": "2026-06-24T13:00:00.000Z",
-    "nowIso": "2026-06-27T06:00:00.000Z"
-  }'
+    "postsPerWeekTarget": 3,
+    "minGapDays": 1,
+    "logoPublicUrl": "https://cdn.example.com/logos/abc.png"
+  },
+  "services": [
+    {
+      "id": "b1c2d3e4-f5a6-4b7c-8d9e-0f1a2b3c4d5e",
+      "name": "ก๋วยเตี๋ยวต้มยำ",
+      "description": "ต้มยำรสจัด เส้นเหนียวนุ่ม ใส่กุ้งสด",
+      "priceMinor": 6000,
+      "currency": "THB",
+      "isActive": true
+    }
+  ],
+  "recentPosts": [
+    {"postedAt": "2026-06-22T11:30:00.000Z", "postType": "product_showcase"},
+    {"postedAt": "2026-06-24T13:00:00.000Z", "postType": "promotion"}
+  ],
+  "recentFeaturedServiceIds": [],
+  "postsThisWeek": 2,
+  "lastPostAt": "2026-06-24T13:00:00.000Z",
+  "nowIso": "2026-06-27T06:00:00.000Z"
+}'
 ```
 
 ### Response (callback)

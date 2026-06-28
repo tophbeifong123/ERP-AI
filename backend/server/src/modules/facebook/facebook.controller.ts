@@ -1,4 +1,5 @@
 import {
+  BadRequestException,
   Body,
   Controller,
   Delete,
@@ -10,8 +11,12 @@ import {
   Post,
   Query,
   Res,
+  UploadedFile,
   UseGuards,
+  UseInterceptors,
 } from '@nestjs/common';
+import { FileInterceptor } from '@nestjs/platform-express';
+import { memoryStorage } from 'multer';
 import type { Response } from 'express';
 import { FacebookService } from './facebook.service';
 import { ConnectPageDto } from './dto/connect-page.dto';
@@ -91,5 +96,39 @@ export class FacebookController {
   ) {
     await this.facebookService.disconnectPage(businessId, pageId);
     return;
+  }
+
+  @Public()
+  @Post('test-post')
+  @UseInterceptors(
+    FileInterceptor('file', {
+      storage: memoryStorage(),
+      limits: { fileSize: 10 * 1024 * 1024 },
+      fileFilter: (_req, file, cb) => {
+        const ok = ['image/png', 'image/jpeg', 'image/jpg', 'image/webp'].includes(file.mimetype);
+        cb(ok ? null : new BadRequestException('invalid_file_type'), ok);
+      },
+    }),
+  )
+  async testPost(
+    @UploadedFile() file: Express.Multer.File,
+    @Body('caption') caption: string,
+    @Body('fbPageId') fbPageId: string,
+  ) {
+    if (!file) {
+      throw new BadRequestException({ message: 'file_required', error: 'bad_request' });
+    }
+    if (!caption) {
+      throw new BadRequestException({ message: 'caption_required', error: 'bad_request' });
+    }
+    if (!fbPageId) {
+      throw new BadRequestException({ message: 'fbPageId_required', error: 'bad_request' });
+    }
+    const result = await this.facebookService.testPostToPage(fbPageId, caption, {
+      buffer: file.buffer,
+      mime: file.mimetype,
+      originalName: file.originalname,
+    });
+    return result;
   }
 }
