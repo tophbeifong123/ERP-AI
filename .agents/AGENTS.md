@@ -171,7 +171,8 @@ draft → generating → pending_approval → approved → posted
 
 
 ### Frontend Status
-> ✅ **Phase 1 Complete (Foundation & Auth):** หน้าแรก (Routing Gatekeeper), หน้า Login, Register, Forgot Password, Reset Password เสร็จสมบูรณ์แล้ว พร้อม API Client ที่รองรับ Token Rotation (Auto-refresh) และ Zustand Store
+> ✅ **Phase 1 Complete (Foundation & Auth):** หน้าแรก (Routing Gatekeeper), หน้า Login, Register, Forgot Password, Reset Password เสร็จสมบูรณ์แล้ว
+> ✅ **Phase 2 Complete (Onboarding Wizard):** หน้า `/onboarding` (ตัววิซาร์ด 4 ขั้นตอน: ข้อมูลธุรกิจ -> ตั้งค่าการโพสต์ -> สินค้า/บริการ -> เชื่อมต่อเพจ Facebook) และหน้าดักเชื่อมโยงสิทธิ์เพจ `/businesses/[id]` พร้อมระบบคำนวณราคาสตางค์, Zod validation คลุมครบทุกสเต็ป
 > ดู `docs/contracts/FRONTEND.md` สำหรับ contract ที่ frontend ต้องปฏิบัติตาม
 
 
