@@ -1,54 +1,55 @@
 # ERP-AI Services
 
-AI microservice for the ERP-AI project. Two endpoints:
+ไมโครเซอร์วิส AI สำหรับโปรเจกต์ ERP-AI มี 2 endpoint:
 
-1. **AI Decision** — decides *whether*, *when*, and *what* a business should post.
-2. **AI Caption** — generates a Thai-language caption for the post.
+1. **AI Decision** — ตัดสินใจว่าธุรกิจ *ควรโพสต์หรือไม่*, *เมื่อไหร่*, และ *โพสต์แบบไหน*
+2. **AI Caption** — สร้างแคปชั่นภาษาไทยสำหรับโพสต์
 
-Built with FastAPI + Groq (Llama 3.3 70B). Aligned to the backend contracts in
-`docs/contracts/AI-DECISION.md` and `AI-CAPTION.md`.
+พัฒนาด้วย FastAPI + Groq (Llama 3.3 70B) และทำให้ตรงตาม contract ของฝั่ง backend
+ที่ `docs/contracts/AI-DECISION.md` และ `AI-CAPTION.md`
 
-## Architecture: async callback
+## สถาปัตยกรรม: Async Callback
 
-Both endpoints are **asynchronous**. The backend POSTs a request containing a
-`callbackUrl`; the service replies **`202 Accepted`** immediately, does the work
-in the background, then **POSTs the result back** to `callbackUrl`.
+ทั้งสอง endpoint ทำงานแบบ **asynchronous** กล่าวคือ backend จะส่ง request ที่มี
+`callbackUrl` มา ตัวเซอร์วิสจะตอบ **`202 Accepted`** กลับทันที แล้วประมวลผลใน
+background จากนั้นจึง **POST ผลลัพธ์กลับ** ไปที่ `callbackUrl`
 
 ```
-Backend  --POST /decide  (with callbackUrl)-->  AI Service
-Backend  <--202 Accepted--------------------    AI Service
-                                                AI Service --(Groq)--> result
-Backend  <--POST {callbackUrl} (result)-------  AI Service
+Backend  --POST /decide  (พร้อม callbackUrl)-->  AI Service
+Backend  <--202 Accepted----------------------   AI Service
+                                                 AI Service --(Groq)--> ผลลัพธ์
+Backend  <--POST {callbackUrl} (ผลลัพธ์)-------   AI Service
 ```
 
-Auth: every request and callback carries an `X-Internal-Token` header (shared secret).
+การยืนยันตัวตน (Auth): ทุก request และ callback จะแนบ header `X-Internal-Token`
+(เป็น secret ที่ใช้ร่วมกันสองฝั่ง)
 
 ---
 
-## Setup
+## การติดตั้ง (Setup)
 
 ```powershell
 cd ai-services
 python -m venv venv
 venv\Scripts\pip install -r requirements.txt
-copy .env.example .env   # then fill in GROQ_API_KEY and INTERNAL_TOKEN
+copy .env.example .env   # แล้วใส่ค่า GROQ_API_KEY และ INTERNAL_TOKEN
 ```
 
-`.env` keys: `GROQ_API_KEY` (required), `INTERNAL_TOKEN` (shared secret).
+ค่าใน `.env`: `GROQ_API_KEY` (จำเป็น), `INTERNAL_TOKEN` (secret ที่ใช้ร่วมกัน)
 
-## Run
+## การรัน (Run)
 
 ```powershell
 venv\Scripts\uvicorn app.main:app --reload
 ```
 
-Docs: <http://localhost:8000/docs> · Health: `GET /health`
+เอกสาร API: <http://localhost:8000/docs> · ตรวจสุขภาพระบบ: `GET /health`
 
 ---
 
 ## Endpoint 1 — AI Decision
 
-`POST /api/ai/decision/decide` → `202 Accepted`, then callback to `callbackUrl`.
+`POST /api/ai/decision/decide` → ตอบ `202 Accepted` แล้ว callback ไปที่ `callbackUrl`
 
 ### Request (backend → AI)
 
@@ -79,10 +80,10 @@ Docs: <http://localhost:8000/docs> · Health: `GET /health`
 }
 ```
 
-> `services[]` is sent by the backend (Option 1) so the AI can pick `featuredServiceIds`.
-> `priceMinor` is in **satang** (6500 = 65.00 THB). `recentFeaturedServiceIds` lists
-> services already featured recently, so the AI avoids repeating them.
-> ⚠️ Field name differs from Caption: Decision uses `priceMinor`, Caption uses `price`.
+> `services[]` ฝั่ง backend เป็นผู้ส่งมา (Option 1) เพื่อให้ AI เลือก `featuredServiceIds` ได้
+> `priceMinor` มีหน่วยเป็น **สตางค์** (6500 = 65.00 บาท) ส่วน `recentFeaturedServiceIds`
+> คือบริการที่เพิ่ง featured ไปไม่นาน เพื่อให้ AI เลี่ยงการเลือกซ้ำ
+> ⚠️ ชื่อฟิลด์ต่างจากฝั่ง Caption: Decision ใช้ `priceMinor` แต่ Caption ใช้ `price`
 
 ### Callback (AI → backend)
 
@@ -100,14 +101,14 @@ Docs: <http://localhost:8000/docs> · Health: `GET /health`
 }
 ```
 
-When `shouldPost` is `false`, only `shouldPost` + `reasoning` are sent. On failure:
-`{ "planId": "...", "error": { "code": "internal_error", "message": "..." } }`.
+เมื่อ `shouldPost` เป็น `false` จะส่งกลับเฉพาะ `shouldPost` + `reasoning`
+กรณีเกิดข้อผิดพลาด: `{ "planId": "...", "error": { "code": "internal_error", "message": "..." } }`
 
 ---
 
 ## Endpoint 2 — AI Caption
 
-`POST /api/ai/caption/generate` → `202 Accepted`, then callback to `callbackUrl`.
+`POST /api/ai/caption/generate` → ตอบ `202 Accepted` แล้ว callback ไปที่ `callbackUrl`
 
 ### Request (backend → AI)
 
@@ -140,28 +141,30 @@ When `shouldPost` is `false`, only `shouldPost` + `reasoning` are sent. On failu
 }
 ```
 
-The caption is a single string (hashtags embedded), ≤2000 chars (100–500 recommended).
-On failure: `{ "jobId": "...", "error": { "code": "model_error", "message": "..." } }`.
+แคปชั่นเป็นข้อความเดียว (ฝัง hashtag ไว้ในตัว) ความยาวไม่เกิน 2000 ตัวอักษร
+(แนะนำ 100–500 ตัวอักษร) กรณีเกิดข้อผิดพลาด:
+`{ "jobId": "...", "error": { "code": "model_error", "message": "..." } }`
 
-> **Media:** this service does **not** trigger AI Media. The backend orchestrates
-> image/video generation separately (see `docs/contracts/AI-MEDIA.md`).
+> **เรื่องสื่อ (Media):** เซอร์วิสนี้ **ไม่ได้** เรียก AI Media เอง ฝั่ง backend จะเป็นผู้
+> จัดการการสร้างรูป/วิดีโอแยกต่างหาก (ดู `docs/contracts/AI-MEDIA.md`)
 
 ---
 
-## Connecting the two (backend)
+## การเชื่อมต่อสองเซอร์วิส (สำหรับ backend)
 
-Decision returns `featuredServiceIds` (IDs); Caption needs `featuredServices`
-(full objects). The backend looks the IDs up in its catalogue between the calls.
-See [`scripts/demo_pipeline.py`](scripts/demo_pipeline.py) for a runnable example
-that prints both callback payloads.
+Decision จะส่ง `featuredServiceIds` (เป็น id เท่านั้น) ส่วน Caption ต้องการ
+`featuredServices` (เป็นออบเจกต์เต็ม) ดังนั้น backend ต้องนำ id ไปค้นหาใน
+แค็ตตาล็อกของตัวเองระหว่างสองการเรียก ดูตัวอย่างที่รันได้จริงได้ที่
+[`scripts/demo_pipeline.py`](scripts/demo_pipeline.py) ซึ่งจะพิมพ์ payload ของ
+callback ทั้งสองออกมา
 
-## Tests
+## การทดสอบ (Tests)
 
 ```powershell
 venv\Scripts\python.exe -m pytest -v
 ```
 
-11 tests covering camelCase parsing, decision rules, caption generation, and
-callback payload shape. Groq is mocked — no API calls.
+มี 11 เทสต์ ครอบคลุมการแปลง camelCase, กฎการตัดสินใจ, การสร้างแคปชั่น และ
+รูปแบบ payload ของ callback โดย Groq ถูก mock ไว้ จึงไม่มีการเรียก API จริง
 
-> On Windows, set `PYTHONIOENCODING=utf-8` before running scripts that print Thai.
+> บน Windows ให้ตั้งค่า `PYTHONIOENCODING=utf-8` ก่อนรันสคริปต์ที่พิมพ์ภาษาไทย
