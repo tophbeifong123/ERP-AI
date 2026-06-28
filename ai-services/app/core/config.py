@@ -7,10 +7,9 @@ class Settings(BaseSettings):
     HOST: str = "0.0.0.0"
     PORT: int = 8000
 
-    BACKEND_BASE_URL: str = "http://localhost:3001"
+    # Shared secret expected in the X-Internal-Token header on incoming
+    # requests, and sent back on the callback to the backend.
     INTERNAL_TOKEN: str = ""
-
-    AI_MEDIA_SERVICE_URL: str = "http://localhost:8001"
 
     GROQ_API_KEY: str = ""
 

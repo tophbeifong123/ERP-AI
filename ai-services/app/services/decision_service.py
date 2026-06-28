@@ -1,34 +1,43 @@
 import json
-from datetime import datetime, timedelta
+from datetime import datetime, timezone
+
 from groq import Groq
+
 from app.core.config import settings
+from app.core.security import post_callback
 from app.schemas.decision import (
     DecisionRequest,
-    DecisionResponse,
-    PostType,
+    Decision,
+    DecisionCallback,
+    DecisionErrorCallback,
+    ErrorInfo,
 )
 
 client = Groq(api_key=settings.GROQ_API_KEY)
 MODEL = "llama-3.3-70b-versatile"
 
 
-def _build_prompt(req: DecisionRequest) -> str:
-    now = req.current_time or datetime.now()
-    services_text = ""
+def _build_prompt(req: DecisionRequest, now: datetime) -> str:
     if req.services:
         services_text = "\n".join(
-            f"  - ID: {s.id}, Name: {s.name}, Description: {s.description or 'N/A'}, Price: {s.price_minor or 'N/A'} satang"
+            f"  - id: {s.id} | {s.name} | {s.description or 'N/A'}"
+            + (f" | {s.price / 100:.0f} {s.currency or 'THB'}" if s.price else "")
+            + (" | INACTIVE" if not s.is_active else "")
             for s in req.services
         )
     else:
-        services_text = "  No services available"
+        services_text = "  No services provided"
 
-    last_post = req.recent_posts.last_post_date
-    days_since_last = (now - last_post).days if last_post else None
-    days_since_text = f"{days_since_last} days ago" if days_since_last is not None else "No posts yet"
+    recent_text = "\n".join(
+        f"  - {p.posted_at.strftime('%Y-%m-%d')} ({p.post_type})" for p in req.recent_posts
+    ) or "  No recent posts"
+
+    last_post = req.last_post_at
+    days_since = (now - last_post).days if last_post else None
+    days_since_text = f"{days_since} days ago" if days_since is not None else "No posts yet"
 
     return f"""You are an AI marketing strategist for Thai SME businesses.
-Your job is to decide whether a business should post on Facebook today.
+Decide whether the business should post on Facebook today.
 
 ## Business Info
 - Name: {req.business.name}
@@ -38,54 +47,52 @@ Your job is to decide whether a business should post on Facebook today.
 - Target Audience: {req.business.target_audience or 'general'}
 - Keywords: {', '.join(req.business.keywords) if req.business.keywords else 'N/A'}
 
-## Services/Products
+## Services/Products (choose featured ids ONLY from this list)
 {services_text}
 
 ## Posting Rules
-- Target: {req.posting_config.posts_per_week_target} posts per week
-- Minimum gap between posts: {req.posting_config.min_gap_days} days
-- Posts this week so far: {req.recent_posts.posts_this_week}
+- Target: {req.business.posts_per_week_target} posts per week
+- Minimum gap between posts: {req.business.min_gap_days} days
+- Posts this week so far: {req.posts_this_week}
 - Last post: {days_since_text}
-- Current date/time: {now.strftime('%Y-%m-%d %H:%M')} (Bangkok time)
+- Recent posts:
+{recent_text}
+- Current date/time: {now.strftime('%Y-%m-%d %H:%M')} UTC
 
 ## Your Task
-Decide if the business should post today. Consider:
-1. Have they reached their weekly target already?
-2. Has enough time passed since the last post (min_gap_days)?
-3. What type of post would be most effective today?
-4. Which service/product should be featured (if any)?
-5. What time would be best for their target audience?
+Decide if the business should post today. Pick 1-3 featured services that are
+active, match the post type, and were not featured in recent posts.
 
 Respond in this exact JSON format (no other text):
 {{
   "should_post": true or false,
-  "reason": "Brief explanation in English",
-  "suggested_scheduled_at": "YYYY-MM-DDTHH:MM:SS" or null,
+  "reasoning": "Brief explanation",
+  "suggested_scheduled_at": "YYYY-MM-DDTHH:MM:SSZ" or null,
   "post_type": "promotion" or "product_showcase" or "brand_awareness" or "event" or null,
   "featured_service_ids": ["id1"] or [],
-  "caption_hint": "Brief hint for caption generation in Thai context" or null
+  "caption_hint": "Brief hint for caption generation" or null
 }}"""
 
 
-def decide(req: DecisionRequest) -> DecisionResponse:
-    now = req.current_time or datetime.now()
+def build_decision(req: DecisionRequest) -> Decision:
+    """Core logic: rule guardrails first, then the AI. Returns a Decision."""
+    now = req.now_iso or datetime.now(timezone.utc)
 
-    if req.recent_posts.posts_this_week >= req.posting_config.posts_per_week_target:
-        return DecisionResponse(
+    if req.posts_this_week >= req.business.posts_per_week_target:
+        return Decision(
             should_post=False,
-            reason=f"Weekly target of {req.posting_config.posts_per_week_target} posts already reached ({req.recent_posts.posts_this_week} posts this week)",
+            reasoning=f"Weekly target of {req.business.posts_per_week_target} posts already reached ({req.posts_this_week} this week)",
         )
 
-    if req.recent_posts.last_post_date:
-        days_since = (now - req.recent_posts.last_post_date).days
-        if days_since < req.posting_config.min_gap_days:
-            return DecisionResponse(
+    if req.last_post_at:
+        days_since = (now - req.last_post_at).days
+        if days_since < req.business.min_gap_days:
+            return Decision(
                 should_post=False,
-                reason=f"Last post was {days_since} day(s) ago, minimum gap is {req.posting_config.min_gap_days} day(s)",
+                reasoning=f"Last post was {days_since} day(s) ago, minimum gap is {req.business.min_gap_days} day(s)",
             )
 
-    prompt = _build_prompt(req)
-
+    prompt = _build_prompt(req, now)
     response = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -99,18 +106,30 @@ def decide(req: DecisionRequest) -> DecisionResponse:
     raw = response.choices[0].message.content.strip()
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-
     data = json.loads(raw)
 
     scheduled_at = None
     if data.get("suggested_scheduled_at"):
-        scheduled_at = datetime.fromisoformat(data["suggested_scheduled_at"])
+        scheduled_at = datetime.fromisoformat(data["suggested_scheduled_at"].replace("Z", "+00:00"))
 
-    return DecisionResponse(
+    return Decision(
         should_post=data["should_post"],
-        reason=data["reason"],
+        reasoning=data["reasoning"],
         suggested_scheduled_at=scheduled_at,
         post_type=data.get("post_type"),
         featured_service_ids=data.get("featured_service_ids", []),
         caption_hint=data.get("caption_hint"),
     )
+
+
+def process_decision(req: DecisionRequest) -> None:
+    """Background task: run the decision and POST the result to callbackUrl."""
+    try:
+        decision = build_decision(req)
+        payload = DecisionCallback(plan_id=req.plan_id, decision=decision)
+    except Exception as e:
+        payload = DecisionErrorCallback(
+            plan_id=req.plan_id,
+            error=ErrorInfo(code="internal_error", message=str(e)),
+        )
+    post_callback(req.callback_url, payload.model_dump(by_alias=True, mode="json"))

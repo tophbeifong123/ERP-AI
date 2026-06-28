@@ -1,14 +1,14 @@
-from fastapi import APIRouter, HTTPException
-from app.schemas.caption import CaptionRequest, CaptionResponse
-from app.services.caption_service import generate_caption
+from fastapi import APIRouter, BackgroundTasks, Depends, status
+
+from app.core.security import verify_internal_token
+from app.schemas.caption import CaptionRequest
+from app.services.caption_service import process_caption
 
 router = APIRouter()
 
 
-@router.post("/generate", response_model=CaptionResponse)
-async def generate_post_caption(request: CaptionRequest):
-    """AI Caption: generate a Thai-language caption and trigger the AI Media service."""
-    try:
-        return generate_caption(request)
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=str(e))
+@router.post("/generate", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(verify_internal_token)])
+async def generate_post_caption(request: CaptionRequest, background_tasks: BackgroundTasks):
+    """AI Caption (async): accept the job, then POST the caption to callbackUrl."""
+    background_tasks.add_task(process_caption, request)
+    return {"status": "accepted", "jobId": request.job_id}
