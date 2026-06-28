@@ -17,7 +17,9 @@ export default registerAs('app', () => ({
   facebook: {
     appId: process.env.FB_APP_ID || '',
     appSecret: process.env.FB_APP_SECRET || '',
-    redirectUri: process.env.FB_REDIRECT_URI || 'http://localhost:3000/facebook/oauth/callback',
+    redirectUri:
+      process.env.FB_REDIRECT_URI ||
+      'http://localhost:3000/facebook/oauth/callback',
     graphVersion: process.env.FB_GRAPH_VERSION || 'v19.0',
   },
   ai: {

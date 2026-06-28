@@ -1,4 +1,13 @@
-import { Inject, Injectable, Logger, OnModuleInit, BadRequestException, ForbiddenException, UnauthorizedException, NotFoundException } from '@nestjs/common';
+import {
+  Inject,
+  Injectable,
+  Logger,
+  OnModuleInit,
+  BadRequestException,
+  ForbiddenException,
+  UnauthorizedException,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
@@ -9,7 +18,11 @@ import { Business } from '../../database/entities/business.entity';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { randomToken } from '../../common/crypto/hash.util';
 
-const FB_OAUTH_SCOPES = ['pages_show_list', 'pages_manage_posts', 'pages_read_engagement'];
+const FB_OAUTH_SCOPES = [
+  'pages_show_list',
+  'pages_manage_posts',
+  'pages_read_engagement',
+];
 const STATE_TTL_SECONDS = 600;
 
 export interface FbPageBasic {
@@ -45,14 +58,22 @@ export class FacebookService implements OnModuleInit {
 
   onModuleInit(): void {
     this.appId = this.configService.get<string>('app.facebook.appId') || '';
-    this.appSecret = this.configService.get<string>('app.facebook.appSecret') || '';
-    this.redirectUri = this.configService.get<string>('app.facebook.redirectUri') || '';
-    this.graphVersion = this.configService.get<string>('app.facebook.graphVersion') || 'v19.0';
-    this.stateSecret = this.configService.get<string>('app.jwt.accessSecret') || '';
+    this.appSecret =
+      this.configService.get<string>('app.facebook.appSecret') || '';
+    this.redirectUri =
+      this.configService.get<string>('app.facebook.redirectUri') || '';
+    this.graphVersion =
+      this.configService.get<string>('app.facebook.graphVersion') || 'v19.0';
+    this.stateSecret =
+      this.configService.get<string>('app.jwt.accessSecret') || '';
     if (!this.appId || !this.appSecret) {
-      this.logger.warn('FB_APP_ID/FB_APP_SECRET not set; Facebook OAuth endpoints will be disabled');
+      this.logger.warn(
+        'FB_APP_ID/FB_APP_SECRET not set; Facebook OAuth endpoints will be disabled',
+      );
     } else {
-      this.logger.log(`Facebook OAuth configured (appId=${this.appId}, graph=${this.graphVersion})`);
+      this.logger.log(
+        `Facebook OAuth configured (appId=${this.appId}, graph=${this.graphVersion})`,
+      );
     }
   }
 
@@ -71,10 +92,16 @@ export class FacebookService implements OnModuleInit {
       where: { id: businessId, deletedAt: IsNull() },
     });
     if (!business) {
-      throw new NotFoundException({ message: 'Business not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Business not found',
+        error: 'not_found',
+      });
     }
     if (business.ownerId !== userId) {
-      throw new ForbiddenException({ message: 'Not business owner', error: 'forbidden' });
+      throw new ForbiddenException({
+        message: 'Not business owner',
+        error: 'forbidden',
+      });
     }
     const state = this.signState(userId, businessId);
     const params = new URLSearchParams({
@@ -93,7 +120,10 @@ export class FacebookService implements OnModuleInit {
   ): Promise<{ businessId: string; userId: string }> {
     const decoded = this.verifyState(state);
     if (!decoded) {
-      throw new UnauthorizedException({ message: 'Invalid OAuth state', error: 'invalid_state' });
+      throw new UnauthorizedException({
+        message: 'Invalid OAuth state',
+        error: 'invalid_state',
+      });
     }
     const tokenRes = await this.graphPost('oauth/access_token', {
       client_id: this.appId,
@@ -114,7 +144,8 @@ export class FacebookService implements OnModuleInit {
       client_secret: this.appSecret,
       fb_exchange_token: shortUserToken,
     });
-    const longUserToken = (longRes as { access_token?: string }).access_token ?? shortUserToken;
+    const longUserToken =
+      (longRes as { access_token?: string }).access_token ?? shortUserToken;
 
     await this.redis.set(
       this.fbTokenKey(decoded.userId, decoded.businessId),
@@ -125,10 +156,17 @@ export class FacebookService implements OnModuleInit {
     return { businessId: decoded.businessId, userId: decoded.userId };
   }
 
-  async listPagesForUser(userId: string, businessId: string): Promise<FbPageBasic[]> {
+  async listPagesForUser(
+    userId: string,
+    businessId: string,
+  ): Promise<FbPageBasic[]> {
     const token = await this.getCachedUserToken(userId, businessId);
     const pages = await this.fetchUserPages(token);
-    return pages.map((p) => ({ fbPageId: p.id, pageName: p.name, pictureUrl: p.pictureUrl }));
+    return pages.map((p) => ({
+      fbPageId: p.id,
+      pageName: p.name,
+      pictureUrl: p.pictureUrl,
+    }));
   }
 
   async connectPage(
@@ -140,7 +178,10 @@ export class FacebookService implements OnModuleInit {
       where: { id: businessId, deletedAt: IsNull() },
     });
     if (!business) {
-      throw new NotFoundException({ message: 'Business not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Business not found',
+        error: 'not_found',
+      });
     }
     const token = await this.getCachedUserToken(userId, businessId);
     const pages = await this.fetchUserPages(token);
@@ -182,7 +223,10 @@ export class FacebookService implements OnModuleInit {
       where: { id: pageId, businessId, deletedAt: IsNull() },
     });
     if (!page) {
-      throw new NotFoundException({ message: 'Page not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Page not found',
+        error: 'not_found',
+      });
     }
     await this.pageRepo.softDelete(page.id);
   }
@@ -195,14 +239,22 @@ export class FacebookService implements OnModuleInit {
   }
 
   async decryptToken(pageId: string): Promise<string> {
-    const page = await this.pageRepo.findOne({ where: { id: pageId, deletedAt: IsNull() } });
+    const page = await this.pageRepo.findOne({
+      where: { id: pageId, deletedAt: IsNull() },
+    });
     if (!page) {
-      throw new NotFoundException({ message: 'Page not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Page not found',
+        error: 'not_found',
+      });
     }
     return this.encryptionService.decrypt(page.accessTokenEncrypted);
   }
 
-  private async getCachedUserToken(userId: string, businessId: string): Promise<string> {
+  private async getCachedUserToken(
+    userId: string,
+    businessId: string,
+  ): Promise<string> {
     const token = await this.redis.get(this.fbTokenKey(userId, businessId));
     if (!token) {
       throw new BadRequestException({
@@ -217,9 +269,14 @@ export class FacebookService implements OnModuleInit {
     return `fb:user_token:${userId}:${businessId}`;
   }
 
-  private async fetchUserPages(
-    userAccessToken: string,
-  ): Promise<Array<{ id: string; name: string; pictureUrl: string | null; accessToken: string }>> {
+  private async fetchUserPages(userAccessToken: string): Promise<
+    Array<{
+      id: string;
+      name: string;
+      pictureUrl: string | null;
+      accessToken: string;
+    }>
+  > {
     const res = await this.graphGet('me/accounts', {
       access_token: userAccessToken,
       fields: 'id,name,picture{url},access_token',
@@ -228,13 +285,17 @@ export class FacebookService implements OnModuleInit {
     return data.map((p) => ({
       id: p.id as string,
       name: p.name as string,
-      pictureUrl: ((p.picture as { data?: { url?: string } } | undefined)?.data?.url) ?? null,
+      pictureUrl:
+        (p.picture as { data?: { url?: string } } | undefined)?.data?.url ??
+        null,
       accessToken: p.access_token as string,
     }));
   }
 
   private signState(userId: string, businessId: string): string {
-    const header = Buffer.from(JSON.stringify({ alg: 'HS256', typ: 'STATE' })).toString('base64url');
+    const header = Buffer.from(
+      JSON.stringify({ alg: 'HS256', typ: 'STATE' }),
+    ).toString('base64url');
     const payload: FbState = {
       userId,
       businessId,
@@ -248,13 +309,17 @@ export class FacebookService implements OnModuleInit {
     return `${data}.${sig}`;
   }
 
-  private verifyState(state: string): { userId: string; businessId: string } | null {
+  private verifyState(
+    state: string,
+  ): { userId: string; businessId: string } | null {
     const parts = state.split('.');
     if (parts.length !== 3) return null;
     const [header, body, sig] = parts;
     if (this.hmac(`${header}.${body}`) !== sig) return null;
     try {
-      const payload = JSON.parse(Buffer.from(body, 'base64url').toString('utf8')) as FbState;
+      const payload = JSON.parse(
+        Buffer.from(body, 'base64url').toString('utf8'),
+      ) as FbState;
       if (!payload.userId || !payload.businessId) return null;
       if (payload.exp < Math.floor(Date.now() / 1000)) return null;
       return { userId: payload.userId, businessId: payload.businessId };
@@ -264,7 +329,9 @@ export class FacebookService implements OnModuleInit {
   }
 
   private hmac(data: string): string {
-    return createHmac('sha256', this.stateSecret).update(data).digest('base64url');
+    return createHmac('sha256', this.stateSecret)
+      .update(data)
+      .digest('base64url');
   }
 
   async testPostToPage(
@@ -287,7 +354,9 @@ export class FacebookService implements OnModuleInit {
         error: 'fb_page_not_found',
       });
     }
-    const accessToken = this.encryptionService.decrypt(page.accessTokenEncrypted);
+    const accessToken = this.encryptionService.decrypt(
+      page.accessTokenEncrypted,
+    );
 
     const form = new FormData();
     form.append('caption', caption);
@@ -325,9 +394,15 @@ export class FacebookService implements OnModuleInit {
     };
   }
 
-  private async graphGet(path: string, params: Record<string, string | number>): Promise<unknown> {
-    const url = new URL(`https://graph.facebook.com/${this.graphVersion}/${path}`);
-    for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
+  private async graphGet(
+    path: string,
+    params: Record<string, string | number>,
+  ): Promise<unknown> {
+    const url = new URL(
+      `https://graph.facebook.com/${this.graphVersion}/${path}`,
+    );
+    for (const [k, v] of Object.entries(params))
+      url.searchParams.set(k, String(v));
     const res = await fetch(url.toString());
     if (!res.ok) {
       const text = await res.text();
@@ -339,7 +414,10 @@ export class FacebookService implements OnModuleInit {
     return res.json();
   }
 
-  private async graphPost(path: string, body: Record<string, string>): Promise<unknown> {
+  private async graphPost(
+    path: string,
+    body: Record<string, string>,
+  ): Promise<unknown> {
     const url = `https://graph.facebook.com/${this.graphVersion}/${path}`;
     const params = new URLSearchParams(body);
     const res = await fetch(url, {

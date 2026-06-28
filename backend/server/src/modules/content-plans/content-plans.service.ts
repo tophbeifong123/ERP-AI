@@ -1,7 +1,10 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import { ContentPlan, ContentPlanStatus } from '../../database/entities/content-plan.entity';
+import {
+  ContentPlan,
+  ContentPlanStatus,
+} from '../../database/entities/content-plan.entity';
 import { Business } from '../../database/entities/business.entity';
 import { Post } from '../../database/entities/post.entity';
 
@@ -13,11 +16,18 @@ export class ContentPlansService {
     @InjectRepository(Post) private postRepo: Repository<Post>,
   ) {}
 
-  async list(filter: { businessId?: string; status?: ContentPlanStatus; decidedBy?: 'ai' | 'user' }): Promise<ContentPlan[]> {
+  async list(filter: {
+    businessId?: string;
+    status?: ContentPlanStatus;
+    decidedBy?: 'ai' | 'user';
+  }): Promise<ContentPlan[]> {
     const qb = this.planRepo.createQueryBuilder('plan');
-    if (filter.businessId) qb.andWhere('plan.businessId = :bid', { bid: filter.businessId });
-    if (filter.status) qb.andWhere('plan.status = :status', { status: filter.status });
-    if (filter.decidedBy) qb.andWhere('plan.decidedBy = :by', { by: filter.decidedBy });
+    if (filter.businessId)
+      qb.andWhere('plan.businessId = :bid', { bid: filter.businessId });
+    if (filter.status)
+      qb.andWhere('plan.status = :status', { status: filter.status });
+    if (filter.decidedBy)
+      qb.andWhere('plan.decidedBy = :by', { by: filter.decidedBy });
     qb.orderBy('plan.createdAt', 'DESC');
     return qb.getMany();
   }
@@ -25,7 +35,10 @@ export class ContentPlansService {
   async getOne(id: string): Promise<ContentPlan> {
     const plan = await this.planRepo.findOne({ where: { id } });
     if (!plan) {
-      throw new NotFoundException({ message: 'Content plan not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Content plan not found',
+        error: 'not_found',
+      });
     }
     return plan;
   }
@@ -36,13 +49,21 @@ export class ContentPlansService {
     return this.planRepo.save(plan);
   }
 
-  async materialize(planId: string): Promise<{ plan: ContentPlan; post: Post }> {
+  async materialize(
+    planId: string,
+  ): Promise<{ plan: ContentPlan; post: Post }> {
     const plan = await this.getOne(planId);
     if (plan.status === 'materialized') {
-      throw new NotFoundException({ message: 'Plan already materialized', error: 'already_materialized' });
+      throw new NotFoundException({
+        message: 'Plan already materialized',
+        error: 'already_materialized',
+      });
     }
     if (plan.status === 'cancelled') {
-      throw new NotFoundException({ message: 'Plan cancelled', error: 'plan_cancelled' });
+      throw new NotFoundException({
+        message: 'Plan cancelled',
+        error: 'plan_cancelled',
+      });
     }
 
     const post = this.postRepo.create({

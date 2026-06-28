@@ -14,7 +14,11 @@ import { AuthService } from './auth.service';
 import { RegisterDto } from './dto/register.dto';
 import { LoginDto } from './dto/login.dto';
 import { RefreshDto } from './dto/refresh.dto';
-import { ForgotPasswordDto, ResetPasswordDto, ChangePasswordDto } from './dto/password.dto';
+import {
+  ForgotPasswordDto,
+  ResetPasswordDto,
+  ChangePasswordDto,
+} from './dto/password.dto';
 import { VerifyEmailDto } from './dto/verify-email.dto';
 import { Public } from '../../common/decorators/public.decorator';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -27,7 +31,11 @@ export class AuthController {
   @Post('register')
   @HttpCode(HttpStatus.CREATED)
   async register(@Body() dto: RegisterDto, @Req() req: Request) {
-    const result = await this.authService.register(dto.email, dto.password, this.meta(req));
+    const result = await this.authService.register(
+      dto.email,
+      dto.password,
+      this.meta(req),
+    );
     return { user: result.user, message: 'verification email sent' };
   }
 
@@ -95,9 +103,17 @@ export class AuthController {
       }
     }
     const frontendUrl = process.env.FRONTEND_URL || 'http://localhost:3001';
-    const dest = ok ? `${frontendUrl}/login?verified=1` : `${frontendUrl}/login?verify_error=1`;
+    const dest = ok
+      ? `${frontendUrl}/login?verified=1`
+      : `${frontendUrl}/login?verify_error=1`;
     res.setHeader('Content-Type', 'text/html; charset=utf-8');
-    res.send(this.landingHtml(ok ? 'Email verified' : 'Verification failed', message, dest));
+    res.send(
+      this.landingHtml(
+        ok ? 'Email verified' : 'Verification failed',
+        message,
+        dest,
+      ),
+    );
   }
 
   @Get('reset-password')
@@ -128,18 +144,30 @@ export class AuthController {
     @Req() req: Request,
   ) {
     const refreshToken = (req.body as { refreshToken?: string })?.refreshToken;
-    await this.authService.changePassword(userId, dto.oldPassword, dto.newPassword, refreshToken);
+    await this.authService.changePassword(
+      userId,
+      dto.oldPassword,
+      dto.newPassword,
+      refreshToken,
+    );
     return { message: 'password changed' };
   }
 
   private meta(req: Request) {
     return {
       userAgent: req.headers['user-agent'],
-      ip: (req.headers['x-forwarded-for'] as string) || req.socket?.remoteAddress || undefined,
+      ip:
+        (req.headers['x-forwarded-for'] as string) ||
+        req.socket?.remoteAddress ||
+        undefined,
     };
   }
 
-  private landingHtml(title: string, message: string, redirectTo: string): string {
+  private landingHtml(
+    title: string,
+    message: string,
+    redirectTo: string,
+  ): string {
     const safeRedirect = redirectTo.replace(/"/g, '&quot;');
     return `<!doctype html><html><head><meta charset="utf-8"><title>${title}</title>
 <meta http-equiv="refresh" content="2;url=${safeRedirect}">

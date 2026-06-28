@@ -20,7 +20,11 @@ export class FilesService {
     originalName?: string,
   ): Promise<File> {
     const prefix = this.getPrefix(kind);
-    const result = await this.s3Service.uploadFile(buffer, `${prefix}/${Date.now()}-${originalName || 'file'}`, contentType);
+    const result = await this.s3Service.uploadFile(
+      buffer,
+      `${prefix}/${Date.now()}-${originalName || 'file'}`,
+      contentType,
+    );
 
     const file = this.fileRepo.create({
       ownerId,
@@ -40,7 +44,11 @@ export class FilesService {
     expiresIn = 300,
   ): Promise<PresignedUploadResult> {
     const prefix = this.getPrefix(kind);
-    return this.s3Service.generatePresignedUploadUrl(prefix, contentType, expiresIn);
+    return this.s3Service.generatePresignedUploadUrl(
+      prefix,
+      contentType,
+      expiresIn,
+    );
   }
 
   async savePresignedUpload(

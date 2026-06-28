@@ -34,7 +34,11 @@ export class TokenService {
   }
 
   signRefreshToken(user: { id: string; email: string }, jti: string): string {
-    const payload: RefreshTokenPayload = { sub: user.id, email: user.email, jti };
+    const payload: RefreshTokenPayload = {
+      sub: user.id,
+      email: user.email,
+      jti,
+    };
     return this.jwtService.sign(payload, {
       secret: this.configService.get<string>('app.jwt.refreshSecret'),
       expiresIn: this.configService.get<number>('app.jwt.refreshTtl'),

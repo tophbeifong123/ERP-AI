@@ -35,12 +35,18 @@ const queueFactory = (config: ConfigService) => ({
       PostFeaturedService,
       File,
     ]),
-    BullModule.registerQueueAsync(
-      { name: 'dispatch-post', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
-    ),
-    BullModule.registerQueueAsync(
-      { name: 'refresh-token-cleanup', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
-    ),
+    BullModule.registerQueueAsync({
+      name: 'dispatch-post',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: queueFactory,
+    }),
+    BullModule.registerQueueAsync({
+      name: 'refresh-token-cleanup',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: queueFactory,
+    }),
     PostsModule,
     AiModule,
   ],

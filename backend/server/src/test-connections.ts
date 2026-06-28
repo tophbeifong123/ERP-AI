@@ -1,6 +1,10 @@
 import { DataSource } from 'typeorm';
 import Redis from 'ioredis';
-import { S3Client, HeadBucketCommand, CreateBucketCommand } from '@aws-sdk/client-s3';
+import {
+  S3Client,
+  HeadBucketCommand,
+  CreateBucketCommand,
+} from '@aws-sdk/client-s3';
 import * as nodemailer from 'nodemailer';
 import { config } from 'dotenv';
 
@@ -107,7 +111,9 @@ async function main() {
   console.log('Environment:');
   console.log(`  DATABASE_HOST: ${process.env.DATABASE_HOST || 'localhost'}`);
   console.log(`  REDIS_HOST: ${process.env.REDIS_HOST || 'localhost'}`);
-  console.log(`  S3_ENDPOINT: ${process.env.S3_ENDPOINT || 'http://localhost:9000'}`);
+  console.log(
+    `  S3_ENDPOINT: ${process.env.S3_ENDPOINT || 'http://localhost:9000'}`,
+  );
   console.log(`  SMTP_HOST: ${process.env.SMTP_HOST || 'localhost'}`);
 
   const results = {
@@ -124,7 +130,9 @@ async function main() {
   console.log(`  Mailhog: ${results.mailhog ? '✅' : '❌'}`);
 
   const allPassed = Object.values(results).every((r) => r);
-  console.log(`\n${allPassed ? '✅ All connections successful!' : '❌ Some connections failed'}`);
+  console.log(
+    `\n${allPassed ? '✅ All connections successful!' : '❌ Some connections failed'}`,
+  );
 
   process.exit(allPassed ? 0 : 1);
 }

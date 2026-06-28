@@ -28,19 +28,27 @@ export class ServicesService {
     dto: CreateServiceDto,
     image?: Express.Multer.File,
   ): Promise<Service> {
-    const business = await this.businessRepo.findOne({ where: { id: businessId, deletedAt: IsNull() } });
+    const business = await this.businessRepo.findOne({
+      where: { id: businessId, deletedAt: IsNull() },
+    });
     if (!business) {
-      throw new NotFoundException({ message: 'Business not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Business not found',
+        error: 'not_found',
+      });
     }
     if (business.ownerId !== ownerId) {
-      throw new NotFoundException({ message: 'Business not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Business not found',
+        error: 'not_found',
+      });
     }
 
     let imageFileId: string | null = null;
     if (image) {
       const saved = await this.filesService.uploadFile(
         ownerId,
-        'service_image' as FileKind,
+        'service_image',
         image.buffer,
         image.mimetype,
         image.originalname,
@@ -75,9 +83,14 @@ export class ServicesService {
   }
 
   async getOne(id: string): Promise<Service> {
-    const service = await this.serviceRepo.findOne({ where: { id, deletedAt: IsNull() } });
+    const service = await this.serviceRepo.findOne({
+      where: { id, deletedAt: IsNull() },
+    });
     if (!service) {
-      throw new NotFoundException({ message: 'Service not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Service not found',
+        error: 'not_found',
+      });
     }
     return service;
   }

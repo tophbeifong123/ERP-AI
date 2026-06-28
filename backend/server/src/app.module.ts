@@ -3,7 +3,13 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { TypeOrmModule } from '@nestjs/typeorm';
 import { ScheduleModule } from '@nestjs/schedule';
 import { BullModule } from '@nestjs/bullmq';
-import { appConfig, databaseConfig, redisConfig, s3Config, mailConfig } from './config';
+import {
+  appConfig,
+  databaseConfig,
+  redisConfig,
+  s3Config,
+  mailConfig,
+} from './config';
 import * as entities from './database/entities';
 import { FilesModule } from './modules/files/files.module';
 import { HealthModule } from './modules/health/health.module';

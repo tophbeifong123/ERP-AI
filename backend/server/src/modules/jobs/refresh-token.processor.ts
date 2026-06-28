@@ -13,7 +13,10 @@ export interface RefreshTokenJobData {
 export class RefreshTokenProcessor extends WorkerHost {
   private readonly logger = new Logger(RefreshTokenProcessor.name);
 
-  constructor(@InjectRepository(RefreshToken) private refreshTokenRepo: Repository<RefreshToken>) {
+  constructor(
+    @InjectRepository(RefreshToken)
+    private refreshTokenRepo: Repository<RefreshToken>,
+  ) {
     super();
   }
 
@@ -24,7 +27,9 @@ export class RefreshTokenProcessor extends WorkerHost {
       expiresAt: LessThan(cutoff),
     });
     const deleted = result.affected ?? 0;
-    this.logger.log(`Refresh-token cleanup: deleted ${deleted} tokens older than ${days} days`);
+    this.logger.log(
+      `Refresh-token cleanup: deleted ${deleted} tokens older than ${days} days`,
+    );
     return { deleted };
   }
 }

@@ -1,7 +1,11 @@
 import { Injectable, Logger, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository, LessThanOrEqual } from 'typeorm';
-import { AiJob, AiJobStatus, AiJobType } from '../../database/entities/ai-job.entity';
+import {
+  AiJob,
+  AiJobStatus,
+  AiJobType,
+} from '../../database/entities/ai-job.entity';
 
 @Injectable()
 export class AiJobsService {
@@ -9,10 +13,15 @@ export class AiJobsService {
 
   constructor(@InjectRepository(AiJob) private jobRepo: Repository<AiJob>) {}
 
-  async list(filter: { type?: AiJobType; status?: AiJobStatus; postId?: string }): Promise<AiJob[]> {
+  async list(filter: {
+    type?: AiJobType;
+    status?: AiJobStatus;
+    postId?: string;
+  }): Promise<AiJob[]> {
     const qb = this.jobRepo.createQueryBuilder('job');
     if (filter.type) qb.andWhere('job.type = :type', { type: filter.type });
-    if (filter.status) qb.andWhere('job.status = :status', { status: filter.status });
+    if (filter.status)
+      qb.andWhere('job.status = :status', { status: filter.status });
     if (filter.postId) qb.andWhere('job.postId = :pid', { pid: filter.postId });
     qb.orderBy('job.createdAt', 'DESC');
     return qb.getMany();
@@ -21,7 +30,10 @@ export class AiJobsService {
   async getOne(id: string): Promise<AiJob> {
     const job = await this.jobRepo.findOne({ where: { id } });
     if (!job) {
-      throw new NotFoundException({ message: 'AI job not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'AI job not found',
+        error: 'not_found',
+      });
     }
     return job;
   }

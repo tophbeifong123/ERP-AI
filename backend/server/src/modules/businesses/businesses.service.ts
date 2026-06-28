@@ -1,8 +1,15 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import { Business, FixedScheduleRule } from '../../database/entities/business.entity';
-import { CreateBusinessDto, UpdateAutoPostDto, UpdateBusinessDto } from './dto/business.dto';
+import {
+  Business,
+  FixedScheduleRule,
+} from '../../database/entities/business.entity';
+import {
+  CreateBusinessDto,
+  UpdateAutoPostDto,
+  UpdateBusinessDto,
+} from './dto/business.dto';
 import { FilesService } from '../files/files.service';
 import { FileKind } from '../../database/entities/file.entity';
 
@@ -22,7 +29,7 @@ export class BusinessesService {
     if (logoFile) {
       const saved = await this.filesService.uploadFile(
         ownerId,
-        'logo' as FileKind,
+        'logo',
         logoFile.buffer,
         logoFile.mimetype,
         logoFile.originalname,
@@ -42,7 +49,7 @@ export class BusinessesService {
       autoPostMode: dto.autoPost?.mode ?? null,
       postsPerWeekTarget: dto.autoPost?.postsPerWeekTarget ?? 3,
       minGapDays: dto.autoPost?.minGapDays ?? 1,
-      fixedScheduleRules: (dto.autoPost?.fixedScheduleRules as FixedScheduleRule[]) ?? [],
+      fixedScheduleRules: dto.autoPost?.fixedScheduleRules ?? [],
       logoFileId,
     });
     return this.businessRepo.save(business);
@@ -51,14 +58,21 @@ export class BusinessesService {
   async listForOwner(ownerId: string): Promise<Business[]> {
     return this.businessRepo.find({
       where: { ownerId, deletedAt: IsNull() },
+      relations: { logo: true, facebookPages: true },
       order: { createdAt: 'DESC' },
     });
   }
 
   async getOne(id: string): Promise<Business> {
-    const business = await this.businessRepo.findOne({ where: { id, deletedAt: IsNull() } });
+    const business = await this.businessRepo.findOne({
+      where: { id, deletedAt: IsNull() },
+      relations: { logo: true, facebookPages: true },
+    });
     if (!business) {
-      throw new NotFoundException({ message: 'Business not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Business not found',
+        error: 'not_found',
+      });
     }
     return business;
   }
@@ -81,11 +95,15 @@ export class BusinessesService {
     await this.businessRepo.softDelete(business.id);
   }
 
-  async uploadLogo(businessId: string, ownerId: string, file: Express.Multer.File) {
+  async uploadLogo(
+    businessId: string,
+    ownerId: string,
+    file: Express.Multer.File,
+  ) {
     const business = await this.getOne(businessId);
     const saved = await this.filesService.uploadFile(
       ownerId,
-      'logo' as FileKind,
+      'logo',
       file.buffer,
       file.mimetype,
       file.originalname,
@@ -101,7 +119,7 @@ export class BusinessesService {
     business.autoPostMode = dto.mode;
     business.postsPerWeekTarget = dto.postsPerWeekTarget;
     business.minGapDays = dto.minGapDays;
-    business.fixedScheduleRules = dto.fixedScheduleRules as FixedScheduleRule[];
+    business.fixedScheduleRules = dto.fixedScheduleRules;
     return this.businessRepo.save(business);
   }
 }

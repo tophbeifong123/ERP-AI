@@ -11,7 +11,12 @@ export { FacebookPage } from './facebook-page.entity';
 export { ContentPlan } from './content-plan.entity';
 export type { ContentPlanStatus, DecidedBy } from './content-plan.entity';
 export { Post } from './post.entity';
-export type { PostStatus, PostType, GenerationSource, RejectionReason } from './post.entity';
+export type {
+  PostStatus,
+  PostType,
+  GenerationSource,
+  RejectionReason,
+} from './post.entity';
 export { PostMedia } from './post-media.entity';
 export type { PostMediaKind } from './post-media.entity';
 export { PostFeaturedService } from './post-featured-service.entity';
