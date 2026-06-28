@@ -153,13 +153,22 @@ draft → generating → pending_approval → approved → posted
 - Custom components ให้สร้างนอก `ui/` directory
 - ใช้ `cn()` helper (`clsx` + `tailwind-merge`) สำหรับ conditional classes
 
-### Styling Rules
+### Styling & UI Rules
 - ใช้ **Tailwind CSS v4** เป็นหลัก — ไม่ใช้ inline styles หรือ CSS modules (ยกเว้นมีเหตุผลพิเศษ)
-- Theme colors ผ่าน CSS variables (กำหนดใน `globals.css`)
-- Base color: **neutral** — ใช้ harmonious color palette
-- ทุก interactive element ต้องมี **hover state** และ **focus state**
-- ต้อง **responsive** — mobile-first design
-- Dark mode support ผ่าน `next-themes`
+- **Theme Mode:** กำหนดให้รันโหมดมืดเป็นหลักโดยเริ่มต้น (Dark-First Theme) โดยใช้ค่าตัวแปร CSS ใน [globals.css](file:///D:/ERP-AI/frontend/src/app/globals.css)
+- **จานสีหลัก (Color Palette):**
+  * Background: Midnight Obsidian (`oklch(0.11 0.012 255.43)`)
+  * Foreground: Soft White (`oklch(0.985 0.002 240)`)
+  * Primary Accent: Indigo Violet (`oklch(0.585 0.233 277.11)`)
+  * Success/Growth: Mint Emerald (`oklch(0.796 0.177 151.71)`)
+- **ดีไซน์มินิมอล & สะอาด (Minimal & Clean Aesthetic):**
+  * คุมโทนการ์ดให้ใช้เทคนิค **Glassmorphism** กึ่งโปร่งแสงคู่กับเส้นขอบขาวบางเบา (`border-white/8` หรือคลาส `.glass-panel`)
+  * ใส่เงาเรืองแสงอ่อนๆ (Ambient Glows) เช่น คลาส `.glow-indigo` เพื่อระบุขอบเขตและให้ความรู้สึกพรีเมียม
+  * เว้นระยะห่างการจัดวาง (Spacings) ให้กว้างและดูสะอาดตา (Generous padding/margin)
+- **การตอบสนองหน้าจอ (Responsive):** ต้องออกแบบแบบ Mobile-First รองรับการใช้งานมือถือ 100%
+- **แบบอักษร (Typography):** ใช้ฟอนต์ตระกูล **Geist** (Geist Sans / Geist Mono) เป็นฟอนต์มินิมอลมาตรฐานระดับพรีเมียมของระบบ
+- ทุกปุ่มและส่วนที่กดได้ (Interactive elements) ต้องมีการระบุเอฟเฟกต์ตอบรับแบบนุ่มนวลเมื่อชี้เมาส์ (Hover) หรือกดเน้น (Focus) เสมอ
+
 
 ### Frontend Status
 > ✅ **Phase 1 Complete (Foundation & Auth):** หน้าแรก (Routing Gatekeeper), หน้า Login, Register, Forgot Password, Reset Password เสร็จสมบูรณ์แล้ว พร้อม API Client ที่รองรับ Token Rotation (Auto-refresh) และ Zustand Store
