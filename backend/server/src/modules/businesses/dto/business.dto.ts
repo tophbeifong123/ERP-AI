@@ -1,7 +1,25 @@
-import { IsArray, IsBoolean, IsIn, IsInt, IsOptional, IsString, Matches, Max, MaxLength, Min, ValidateNested } from 'class-validator';
-import { Type } from 'class-transformer';
+import {
+  IsArray,
+  IsBoolean,
+  IsIn,
+  IsInt,
+  IsOptional,
+  IsString,
+  Matches,
+  Max,
+  MaxLength,
+  Min,
+  ValidateNested,
+} from 'class-validator';
+import { Type, Transform } from 'class-transformer';
 
-export const TONES = ['friendly', 'professional', 'playful', 'luxurious', 'minimal'] as const;
+export const TONES = [
+  'friendly',
+  'professional',
+  'playful',
+  'luxurious',
+  'minimal',
+] as const;
 export type Tone = (typeof TONES)[number];
 
 export const AUTO_POST_MODES = ['ai_decide', 'fixed_schedule'] as const;
@@ -66,6 +84,17 @@ export class CreateBusinessDto {
   tone?: Tone;
 
   @IsOptional()
+  @Transform(({ value }: { value: unknown }): string[] => {
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        return Array.isArray(parsed) ? (parsed as string[]) : [value];
+      } catch {
+        return [value];
+      }
+    }
+    return Array.isArray(value) ? (value as string[]) : [];
+  })
   @IsArray()
   @IsString({ each: true })
   keywords?: string[];
@@ -82,7 +111,21 @@ export class UpdateBusinessDto {
   @IsOptional() @IsString() @MaxLength(2000) description?: string;
   @IsOptional() @IsString() @MaxLength(500) targetAudience?: string;
   @IsOptional() @IsIn(TONES as readonly string[]) tone?: Tone;
-  @IsOptional() @IsArray() @IsString({ each: true }) keywords?: string[];
+  @IsOptional()
+  @Transform(({ value }: { value: unknown }): string[] => {
+    if (typeof value === 'string') {
+      try {
+        const parsed = JSON.parse(value) as unknown;
+        return Array.isArray(parsed) ? (parsed as string[]) : [value];
+      } catch {
+        return [value];
+      }
+    }
+    return Array.isArray(value) ? (value as string[]) : [];
+  })
+  @IsArray()
+  @IsString({ each: true })
+  keywords?: string[];
 }
 
 export class UpdateAutoPostDto {
@@ -90,6 +133,8 @@ export class UpdateAutoPostDto {
   @IsIn(AUTO_POST_MODES as readonly string[]) mode: AutoPostMode;
   @IsInt() @Min(1) @Max(14) postsPerWeekTarget: number;
   @IsInt() @Min(0) @Max(7) minGapDays: number;
-  @IsArray() @ValidateNested({ each: true }) @Type(() => FixedScheduleRuleDto)
+  @IsArray()
+  @ValidateNested({ each: true })
+  @Type(() => FixedScheduleRuleDto)
   fixedScheduleRules: FixedScheduleRuleDto[];
 }
