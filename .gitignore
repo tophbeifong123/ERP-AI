@@ -1,0 +1,94 @@
+# Dependencies
+node_modules/
+.pnp
+.pnp.*
+.yarn/*
+!.yarn/patches
+!.yarn/plugins
+!.yarn/releases
+!.yarn/versions
+
+# Build output
+dist/
+build/
+.next/
+out/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+!.env.example
+
+# Logs
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+
+# Testing
+coverage/
+.nyc_output
+
+# Editor / IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+*.pem
+
+# Misc
+.vercel
+next-env.d.ts
+
+# NestJS debug
+nest-cli.json.bak
+tsconfig.build.tsbuildinfo
+
+# Docker / runtime
+*.pid
+*.seed
+*.pid.lock
+
+# AI stubs (mocked services — generated assets)
+ai-stubs/**/dist/
+ai-stubs/**/node_modules/
+ai-stubs/**/placeholder-assets/
+ai-stubs/**/.env
+
+# Postman — local-only
+postman/PostmanLocal/
+postman/**/*-local.postman_environment.json
+postman/**/*.postman_test_run.json
+# Note: ERP-AI.postman_collection.json and ERP-AI.postman_environment.json ARE committed (shared)
+
+# Local logs
+logs/
+*.local.log
+server.log
+server*.log
+
+# Claude / opencode local state
+.claude/
+.opencode/
+.opencode-state/
+
+# Caches
+.cache/
+.turbo/
+.parcel-cache/
+.eslintcache
+
+# Test artifacts
+test-results/
+playwright-report/
+playwright/.cache/
+cypress/videos/
+cypress/screenshots/
