@@ -267,6 +267,64 @@ export class FacebookService implements OnModuleInit {
     return createHmac('sha256', this.stateSecret).update(data).digest('base64url');
   }
 
+  async testPostToPage(
+    fbPageUuid: string,
+    caption: string,
+    image: { buffer: Buffer; mime: string; originalName: string },
+  ): Promise<{ fbPostId: string; viewUrl: string; pageName: string }> {
+    if (!this.isConfigured()) {
+      throw new BadRequestException({
+        message: 'Facebook app credentials not configured',
+        error: 'fb_not_configured',
+      });
+    }
+    const page = await this.pageRepo.findOne({
+      where: { id: fbPageUuid, deletedAt: IsNull() },
+    });
+    if (!page) {
+      throw new NotFoundException({
+        message: 'Facebook page not found',
+        error: 'fb_page_not_found',
+      });
+    }
+    const accessToken = this.encryptionService.decrypt(page.accessTokenEncrypted);
+
+    const form = new FormData();
+    form.append('caption', caption);
+    form.append('access_token', accessToken);
+    form.append('published', 'true');
+    const blob = new Blob([new Uint8Array(image.buffer)], { type: image.mime });
+    form.append('source', blob, image.originalName);
+
+    const res = await fetch(
+      `https://graph.facebook.com/${this.graphVersion}/${page.fbPageId}/photos`,
+      { method: 'POST', body: form },
+    );
+    const data = (await res.json()) as {
+      id?: string;
+      error?: { message: string; type?: string; code: number };
+    };
+    if (!res.ok || !data.id) {
+      this.logger.error(
+        `testPostToPage failed: status=${res.status} body=${JSON.stringify(data).slice(0, 300)}`,
+      );
+      throw new BadRequestException({
+        message: data.error?.message ?? `Facebook API returned ${res.status}`,
+        error: 'fb_graph_error',
+        fbCode: data.error?.code,
+        fbType: data.error?.type,
+      });
+    }
+    this.logger.log(
+      `testPostToPage ok: page=${page.fbPageId} fbPostId=${data.id} captionLen=${caption.length}`,
+    );
+    return {
+      fbPostId: data.id,
+      viewUrl: `https://facebook.com/${data.id}`,
+      pageName: page.pageName,
+    };
+  }
+
   private async graphGet(path: string, params: Record<string, string | number>): Promise<unknown> {
     const url = new URL(`https://graph.facebook.com/${this.graphVersion}/${path}`);
     for (const [k, v] of Object.entries(params)) url.searchParams.set(k, String(v));
