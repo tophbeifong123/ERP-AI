@@ -44,23 +44,61 @@
 - **Styling:** Vanilla CSS
 - **Linting:** ESLint
 
-### 📂 โครงสร้าง
+### 📂 โครงสร้างส่วนหน้าบ้าน (Frontend Directory Structure)
 ```
 frontend/
 ├── src/
-│   ├── app/            # App Router (pages, layouts, API route handlers)
-│   ├── components/     # Reusable UI components
-│   └── lib/            # API clients, hooks, types
-├── public/             # Static files
+│   ├── app/                    # Routing Layer (App Router)
+│   │   ├── (auth)/             # ระบบสิทธิ์การใช้งาน (Login, Register, etc.)
+│   │   ├── globals.css         # กำหนดตัวแปร CSS & นำเข้า Tailwind v4
+│   │   ├── layout.tsx          # Root Layout (ติดตั้ง Toaster แจ้งเตือน)
+│   │   └── page.tsx            # หน้าดักเส้นทางหลัก (Routing Gatekeeper)
+│   ├── components/             # UI Presentation Components
+│   │   └── ui/                 # อะตอมคอมโพเนนต์จาก shadcn/ui
+│   ├── core/                   # Domain & API Layer (Clean Architecture)
+│   │   ├── services/           # apiClient.ts และ APIs เรียกหลังบ้าน
+│   │   ├── types/              # ไฟล์นิยามประเภทข้อมูล TypeScript
+│   │   └── validations/        # ไฟล์ Zod validation schemas สำหรับฟอร์ม
+│   └── hooks/                  # React Hooks & State Management
+│       └── store/              # Zustand stores (use-auth-store.ts)
+├── public/                     # ไฟล์ Static
 └── ...
 ```
 
-### ⚙️ เริ่มต้นใช้งาน
+
+### ⚙️ การเริ่มต้นใช้งานระบบ (Getting Started)
+
+ระบบประกอบด้วย 3 ส่วนหลักที่ต้องเปิดใช้งานในการทดสอบระบบ:
+
+#### 1. สตาร์ทฐานข้อมูลและบริการเสริม (ผ่าน Podman หรือ Docker)
+รันบริการ PostgreSQL, Redis, MinIO และ Mailhog ค้างไว้เบื้องหลัง:
+```bash
+# ใช้ Podman Compose
+podman compose up -d
+
+# หรือใช้ Docker Compose
+docker compose up -d
+```
+
+#### 2. รันเซิร์ฟเวอร์หลังบ้าน (Backend - NestJS)
+เปิดหน้าต่าง Terminal ใหม่เพื่อเริ่มการทำงานของ API Server:
+```bash
+cd backend/server
+copy .env.example .env    # ทำเฉพาะครั้งแรก
+pnpm install
+pnpm migration:run        # สั่งรัน Database Migrations (ทำเฉพาะครั้งแรก)
+pnpm start:dev            # เริ่มระบบที่ http://localhost:3000
+```
+
+#### 3. รันเซิร์ฟเวอร์หน้าบ้าน (Frontend - Next.js)
+เปิดหน้าต่าง Terminal ใหม่เพื่อรันแอปพลิเคชันส่วนหน้าตาเว็บ:
 ```bash
 cd frontend
-npm install
-npm run dev   # http://localhost:3000
+pnpm install
+pnpm dev                  # เริ่มระบบที่ http://localhost:3001
 ```
+เปิดเบราว์เซอร์ไปที่ [http://localhost:3001](http://localhost:3001) เพื่อใช้งานหน้าบ้านที่มีระบบดักกรองเส้นทางหลักและหน้าล็อกอิน/สมัครสมาชิก (Phase 1)
+
 
 ---
 
