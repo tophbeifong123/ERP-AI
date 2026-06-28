@@ -132,4 +132,13 @@ export const businessService = {
   async deleteBusiness(id: string): Promise<void> {
     await apiClient.delete(`/businesses/${id}`);
   },
+
+  /**
+   * ยกเลิกการผูกเพจ Facebook (DELETE /facebook/businesses/:id/facebook-pages/:pageId)
+   */
+  async disconnectFacebookPage(businessId: string, pageId: string): Promise<void> {
+    await apiClient.delete(
+      `/facebook/businesses/${businessId}/facebook-pages/${pageId}`
+    );
+  },
 };

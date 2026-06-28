@@ -8,8 +8,12 @@ import { Post } from '../../database/entities/post.entity';
 import { ContentPlan } from '../../database/entities/content-plan.entity';
 import { AiJob } from '../../database/entities/ai-job.entity';
 import { FacebookPage } from '../../database/entities/facebook-page.entity';
+import { Service } from '../../database/entities/service.entity';
+import { PostFeaturedService } from '../../database/entities/post-featured-service.entity';
+import { File } from '../../database/entities/file.entity';
 import { SchedulerService } from './scheduler.service';
 import { PostsModule } from '../posts/posts.module';
+import { AiModule } from '../ai/ai.module';
 
 const queueFactory = (config: ConfigService) => ({
   connection: {
@@ -27,6 +31,9 @@ const queueFactory = (config: ConfigService) => ({
       ContentPlan,
       AiJob,
       FacebookPage,
+      Service,
+      PostFeaturedService,
+      File,
     ]),
     BullModule.registerQueueAsync({
       name: 'dispatch-post',
@@ -41,6 +48,7 @@ const queueFactory = (config: ConfigService) => ({
       useFactory: queueFactory,
     }),
     PostsModule,
+    AiModule,
   ],
   providers: [SchedulerService],
   exports: [SchedulerService],

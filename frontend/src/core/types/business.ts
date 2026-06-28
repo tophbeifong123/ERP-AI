@@ -16,6 +16,16 @@ export interface AutoPostConfig {
   fixedScheduleRules: FixedScheduleRule[];
 }
 
+export interface FacebookPageRelation {
+  id: string;
+  businessId: string;
+  fbPageId: string;
+  pageName: string;
+  pictureUrl: string | null;
+  tokenExpiresAt: string;
+  scopes: string[];
+}
+
 export interface Business {
   id: string;
   ownerId: string;
@@ -37,4 +47,5 @@ export interface Business {
     id: string;
     publicUrl: string;
   } | null;
+  facebookPages?: FacebookPageRelation[];
 }
