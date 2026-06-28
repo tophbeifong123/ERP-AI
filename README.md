@@ -41,7 +41,8 @@
 ### 🛠️ เทคโนโลยี
 - **Framework:** [Next.js](https://nextjs.org/) (App Router, React 19)
 - **Language:** TypeScript (strict)
-- **Styling:** Vanilla CSS
+- **Styling:** Tailwind CSS v4 ( Obsidian Dark & Indigo / Mint Premium Theme )
+- **Typography:** Geist Sans / Geist Mono ( Clean & Premium Minimalist font )
 - **Linting:** ESLint
 
 ### 📂 โครงสร้างส่วนหน้าบ้าน (Frontend Directory Structure)
