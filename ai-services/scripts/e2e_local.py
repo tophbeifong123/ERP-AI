@@ -137,7 +137,8 @@ def test_decision_rule_path_roundtrip(client: TestClient):
     check("Uses camelCase key 'shouldPost'", "shouldPost" in decision)
 
 
-def test_caption_roundtrip_with_groq(client: TestClient):
+def test_caption_roundtrip_with_groq(client: TestClient, media_type: str,
+                                     expect_aspect: str, expect_scenes: int):
     received.clear()
     payload = {
         "callbackUrl": _cb_url("/internal/ai/caption/callback"),
@@ -150,14 +151,14 @@ def test_caption_roundtrip_with_groq(client: TestClient):
         ],
         "captionHint": "โปรวันศุกร์",
         "targetAudience": "คนรุ่นใหม่",
-        "mediaType": "short_video",
+        "mediaType": media_type,
     }
     r = client.post("/api/ai/caption/generate", json=payload,
                     headers={"X-Internal-Token": TOKEN})
-    check("Caption returns 202 Accepted", r.status_code == 202, f"got {r.status_code}")
+    check(f"[{media_type}] returns 202 Accepted", r.status_code == 202, f"got {r.status_code}")
 
     got = _wait_for_callback(1, timeout=30.0)
-    check("Caption callback delivered (real Groq)", got)
+    check(f"[{media_type}] callback delivered (real Groq)", got)
     if not got:
         return
     body = received[0]["body"] or {}
@@ -165,12 +166,17 @@ def test_caption_roundtrip_with_groq(client: TestClient):
     caption = result.get("caption", "")
     mr = result.get("mediaRequest") or {}
     scenes = mr.get("scenes", [])
-    check("Callback has jobId + result.caption", body.get("jobId") == "job-e2e-1" and bool(caption))
-    check("mediaRequest content_type is short_video", mr.get("content_type") == "short_video")
-    check("mediaRequest has 4 scenes", len(scenes) == 4)
-    check("Scene prompts are English", bool(scenes) and all(s["prompt"].isascii() for s in scenes))
-    print(f"\n  Generated caption:\n  {caption}\n")
-    print("  Generated scenes (English):")
+    check(f"[{media_type}] jobId + caption", body.get("jobId") == "job-e2e-1" and bool(caption))
+    check(f"[{media_type}] content_type", mr.get("content_type") == media_type, mr.get("content_type"))
+    check(f"[{media_type}] aspect_ratio {expect_aspect}", mr.get("aspect_ratio") == expect_aspect,
+          mr.get("aspect_ratio"))
+    check(f"[{media_type}] {expect_scenes} scene(s)", len(scenes) == expect_scenes, f"got {len(scenes)}")
+    check(f"[{media_type}] top-level prompt present", bool(mr.get("prompt")))
+    check(f"[{media_type}] scenes are English", bool(scenes) and all(s["prompt"].isascii() for s in scenes))
+    check(f"[{media_type}] style present", bool(mr.get("style")))
+    print(f"\n  [{media_type}] style: {mr.get('style')}")
+    print(f"  [{media_type}] caption:\n  {caption}")
+    print(f"  [{media_type}] scenes (English):")
     for i, s in enumerate(scenes, 1):
         print(f"   {i}. {s['prompt']}")
     print()
@@ -194,8 +200,10 @@ def main():
             print("\n== Decision round-trip (rule path, no Groq) ==")
             test_decision_rule_path_roundtrip(client)
             if args.with_groq:
-                print("\n== Caption round-trip (real Groq) ==")
-                test_caption_roundtrip_with_groq(client)
+                print("\n== Caption round-trip: IMAGE (real Groq) ==")
+                test_caption_roundtrip_with_groq(client, "image", "4:5", 1)
+                print("== Caption round-trip: SHORT_VIDEO (real Groq) ==")
+                test_caption_roundtrip_with_groq(client, "short_video", "9:16", 4)
             else:
                 print("\n(skip caption+Groq round-trip; pass --with-groq to include it)")
     finally:

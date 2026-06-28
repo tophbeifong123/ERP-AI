@@ -104,6 +104,28 @@ def test_video_media_request_four_scenes(monkeypatch):
     assert len(mr.scenes) == caption_service.VIDEO_SCENE_COUNT  # capped to 4
 
 
+def test_uses_ai_chosen_style(monkeypatch):
+    """When the model returns a style, it is used in the media request."""
+    fake = json.dumps({
+        "caption": "อร่อย! #อาหาร",
+        "style": "cinematic food commercial",
+        "scenes": ["A close-up of steaming noodles, warm light, no text"],
+    })
+    monkeypatch.setattr(caption_service.client.chat.completions, "create", _fake_groq(fake))
+
+    result = caption_service.build_caption(_request(media_type="image"))
+    assert result.media_request.style == "cinematic food commercial"
+
+
+def test_style_falls_back_to_default(monkeypatch):
+    """If the model omits style, fall back to DEFAULT_STYLE."""
+    fake = json.dumps({"caption": "hi", "scenes": ["A bowl of noodles, warm light, no text"]})
+    monkeypatch.setattr(caption_service.client.chat.completions, "create", _fake_groq(fake))
+
+    result = caption_service.build_caption(_request(media_type="image"))
+    assert result.media_request.style == caption_service.DEFAULT_STYLE
+
+
 def test_media_request_absent_when_no_scenes(monkeypatch):
     """If the model omits scenes, we still succeed with media_request None."""
     monkeypatch.setattr(caption_service.client.chat.completions, "create",

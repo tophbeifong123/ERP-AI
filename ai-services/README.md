@@ -170,9 +170,9 @@ request มีฟิลด์ `mediaType` = `"image"` หรือ `"short_video
 > เราส่งทั้ง `prompt` และ `scenes` เพื่อให้เข้ากันได้ทั้งสอง branch ของ AI Media
 >
 > ⚠️ **หมายเหตุการเชื่อมต่อ:** (1) backend เติม `callback_url` ก่อนส่งต่อ (ใช้กับ video เท่านั้น
-> — image ตอบกลับใน HTTP response เลย); (2) `style` เป็นข้อความอิสระ (default `cinematic_fantasy`);
-> (3) ยืนยันว่า image model รองรับ `4:5`; (4) callback ของ AI Media (Google Drive + n8n)
-> ไม่ตรงกับ `docs/contracts/AI-MEDIA.md` เดิม — doc ควรอัปเดต
+> — image ตอบกลับใน HTTP response เลย); (2) `style` ถูกเลือกโดย AI ให้เหมาะกับสินค้า
+> (fallback `modern_minimal`); (3) image `4:5` ยืนยันแล้วว่าใช้ได้; (4) callback ของ AI Media
+> (Google Drive + n8n) ไม่ตรงกับ `docs/contracts/AI-MEDIA.md` เดิม — doc ควรอัปเดต
 
 > **เรื่องสื่อ (Media):** เซอร์วิสนี้ **ไม่ได้** เรียก AI Media เอง เราเพียงสร้าง `mediaRequest`
 > ให้ ส่วน backend จะเป็นผู้ส่งต่อ (พร้อมเติม `callback_url`) ไปยัง AI Media

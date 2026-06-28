@@ -25,7 +25,8 @@ MAX_SCENE_CHARS = 600
 ASPECT_RATIO = {"image": "4:5", "short_video": "9:16"}
 VIDEO_SCENE_COUNT = 4   # each scene ~8s (AI Media limit) -> ~32s total
 IMAGE_SCENE_COUNT = 1
-DEFAULT_STYLE = "cinematic_fantasy"
+DEFAULT_STYLE = "modern_minimal"   # fallback if the model doesn't pick a style
+MAX_STYLE_CHARS = 60
 NEGATIVE_PROMPT = "blurry, low quality, text, logo, watermark"
 
 
@@ -94,21 +95,26 @@ def _build_prompt(req: CaptionRequest) -> str:
   ถ้าต้องสื่อโปรโมชัน/ราคา ให้ใช้ภาษากายและการกระทำแทน (no text, no logo, no watermark)
 - กระชับ ไม่เกิน {MAX_SCENE_CHARS} ตัวอักษรต่อฉาก
 
+### 3) style (ภาษาอังกฤษ สั้นๆ)
+เลือก "สไตล์ภาพรวม" ที่เหมาะกับสินค้า/แบรนด์/ประเภทโพสต์มากที่สุด เป็นวลีสั้นๆ ภาษาอังกฤษ
+(เช่น "warm lifestyle photography", "modern minimal product shot", "cinematic food commercial")
+
 ตอบกลับเป็น JSON นี้เท่านั้น (ห้ามมีข้อความอื่น) โดย scenes มี {n} รายการ:
 {{
   "caption": "เนื้อหาแคปชั่นภาษาไทย รวม emoji และ hashtag",
+  "style": "short English style descriptor",
   "scenes": ["English scene 1", ...]
 }}"""
 
 
-def _build_media_request(req: CaptionRequest, scene_prompts: list[str]) -> MediaRequest:
+def _build_media_request(req: CaptionRequest, scene_prompts: list[str], style: str) -> MediaRequest:
     n = _scene_count(req.media_type)
     cleaned = [p.strip()[:MAX_SCENE_CHARS] for p in scene_prompts if p and p.strip()]
     scenes = [Scene(prompt=p) for p in cleaned[:n]]
     return MediaRequest(
         content_type=req.media_type,
         aspect_ratio=ASPECT_RATIO[req.media_type],
-        style=DEFAULT_STYLE,
+        style=style,
         negative_prompt=NEGATIVE_PROMPT,
         prompt=cleaned[0] if cleaned else "",   # image branch reads this
         scenes=scenes,
@@ -136,7 +142,8 @@ def build_caption(req: CaptionRequest) -> CaptionResult:
 
     caption = data["caption"].strip()[:MAX_CAPTION_CHARS]
     scene_prompts = data.get("scenes") or []
-    media_request = _build_media_request(req, scene_prompts) if scene_prompts else None
+    style = (data.get("style") or "").strip()[:MAX_STYLE_CHARS] or DEFAULT_STYLE
+    media_request = _build_media_request(req, scene_prompts, style) if scene_prompts else None
     return CaptionResult(caption=caption, media_request=media_request)
 
 
