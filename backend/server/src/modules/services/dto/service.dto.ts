@@ -6,7 +6,7 @@ import {
   MaxLength,
   Min,
 } from 'class-validator';
-import { Type } from 'class-transformer';
+import { Type, Transform } from 'class-transformer';
 
 export class CreateServiceDto {
   @IsString()
@@ -34,5 +34,11 @@ export class UpdateServiceDto {
   @IsOptional() @IsString() @MaxLength(2000) description?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) price?: number;
   @IsOptional() @IsString() @MaxLength(3) currency?: string;
-  @IsOptional() @IsBoolean() isActive?: boolean;
+  @IsOptional()
+  @Transform(
+    ({ value }) =>
+      value === 'true' || value === true || value === '1' || value === 1,
+  )
+  @IsBoolean()
+  isActive?: boolean;
 }

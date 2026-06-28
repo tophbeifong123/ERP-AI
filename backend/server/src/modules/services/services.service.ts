@@ -5,7 +5,6 @@ import { Service } from '../../database/entities/service.entity';
 import { Business } from '../../database/entities/business.entity';
 import { CreateServiceDto, UpdateServiceDto } from './dto/service.dto';
 import { FilesService } from '../files/files.service';
-import { FileKind } from '../../database/entities/file.entity';
 
 export interface PaginatedServices {
   services: Service[];
@@ -98,13 +97,30 @@ export class ServicesService {
     return service;
   }
 
-  async update(id: string, dto: UpdateServiceDto): Promise<Service> {
+  async update(
+    id: string,
+    dto: UpdateServiceDto,
+    ownerId: string,
+    image?: Express.Multer.File,
+  ): Promise<Service> {
     const service = await this.getOne(id);
     if (dto.name !== undefined) service.name = dto.name;
     if (dto.description !== undefined) service.description = dto.description;
     if (dto.price !== undefined) service.priceMinor = dto.price * 100;
     if (dto.currency !== undefined) service.currency = dto.currency;
     if (dto.isActive !== undefined) service.isActive = dto.isActive;
+
+    if (image) {
+      const saved = await this.filesService.uploadFile(
+        ownerId,
+        'service_image',
+        image.buffer,
+        image.mimetype,
+        image.originalname,
+      );
+      service.imageFileId = saved.id;
+    }
+
     await this.serviceRepo.save(service);
     return this.getOne(id);
   }
