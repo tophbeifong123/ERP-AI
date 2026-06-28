@@ -50,17 +50,18 @@ X-Internal-Token: <INTERNAL_TOKEN>
     "caption": "…แคปชั่นภาษาไทยฉบับเต็มพร้อม #hashtag…",
     "mediaRequest": {
       "content_type": "short_video",     // หรือ "image"
-      "aspect_ratio": "9:16",            // image = "5:4"
+      "aspect_ratio": "9:16",            // image = "4:5"
       "style": "cinematic_fantasy",
       "negative_prompt": "blurry, low quality, text, logo, watermark",
+      "prompt": "English scene 1",       // AI Media image branch อ่านฟิลด์นี้
       "scenes": [ { "prompt": "English scene 1" }, ... ],   // video=4, image=1
       "metadata": { "campaign_id": "<postId>" }
     } } }
 ```
-> `mediaRequest` คือ payload สำหรับ AI Media โดยตรง (snake_case) scene prompts เป็น
-> **ภาษาอังกฤษ** video = 4 ฉาก (ฉากละ ~8 วินาที), image = 1 ฉาก
-> ⚠️ **backend ต้องเติม `callback_url`** ของ AI Media ก่อนส่งต่อ และต้องยืนยันค่า `style`
-> ที่ใช้ได้กับทีม AI Media (default `cinematic_fantasy`)
+> `mediaRequest` คือ payload สำหรับ AI Media (n8n) โดยตรง (snake_case) scene prompts
+> **ภาษาอังกฤษ** video = 4 ฉาก (ฉากละ ~8 วินาที), image = 1 ฉาก เราส่งทั้ง `prompt`
+> (image branch ใช้) และ `scenes` (video branch ใช้)
+> ⚠️ **backend เติม `callback_url`** ก่อนส่งต่อ (image ตอบใน HTTP response, video ใช้ callback)
 
 **Callback กรณีข้อผิดพลาด (ทั้งสองเซอร์วิส):**
 ```json

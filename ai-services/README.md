@@ -146,6 +146,7 @@ request มีฟิลด์ `mediaType` = `"image"` หรือ `"short_video
       "aspect_ratio": "9:16",
       "style": "cinematic_fantasy",
       "negative_prompt": "blurry, low quality, text, logo, watermark",
+      "prompt": "Scene 1: English visual description ...",
       "scenes": [
         { "prompt": "Scene 1: English visual description ..." },
         { "prompt": "Scene 2: ..." },
@@ -162,15 +163,16 @@ request มีฟิลด์ `mediaType` = `"image"` หรือ `"short_video
 (แนะนำ 100–500 ตัวอักษร) กรณีเกิดข้อผิดพลาด:
 `{ "jobId": "...", "error": { "code": "model_error", "message": "..." } }`
 
-> **`mediaRequest` (scene prompts ภาษาอังกฤษ):** payload สำหรับ AI Media ในรูปแบบของ
-> AI Media เอง (snake_case). `content_type` มาจาก `mediaType` ใน request:
-> `image` → 1 scene, `aspect_ratio` `5:4`; `short_video` → 4 scenes (ฉากละ ~8 วินาที,
-> ต่อเนื่องเป็นเรื่องเดียว), `aspect_ratio` `9:16`
+> **`mediaRequest` (scene prompts ภาษาอังกฤษ):** payload สำหรับ AI Media (n8n) ในรูปแบบ
+> snake_case. `content_type` มาจาก `mediaType` ใน request:
+> `image` → `aspect_ratio` `4:5`, ใช้ฟิลด์ `prompt` (top-level);
+> `short_video` → `aspect_ratio` `9:16`, ใช้ `scenes` 4 ฉาก (ฉากละ ~8 วินาที ต่อเนื่อง)
+> เราส่งทั้ง `prompt` และ `scenes` เพื่อให้เข้ากันได้ทั้งสอง branch ของ AI Media
 >
-> ⚠️ **ต้องยืนยันกับทีม:** (1) backend ต้องเติม `callback_url` ก่อนส่งต่อให้ AI Media;
-> (2) ค่า `style` ที่ใช้ได้มีอะไรบ้าง (ตอนนี้ default `cinematic_fantasy`);
-> (3) โครงสร้างนี้ยังไม่ตรงกับ `docs/contracts/AI-MEDIA.md` เดิม — ใช้ตามที่ทีม AI Media
-> กำหนดล่าสุด
+> ⚠️ **หมายเหตุการเชื่อมต่อ:** (1) backend เติม `callback_url` ก่อนส่งต่อ (ใช้กับ video เท่านั้น
+> — image ตอบกลับใน HTTP response เลย); (2) `style` เป็นข้อความอิสระ (default `cinematic_fantasy`);
+> (3) ยืนยันว่า image model รองรับ `4:5`; (4) callback ของ AI Media (Google Drive + n8n)
+> ไม่ตรงกับ `docs/contracts/AI-MEDIA.md` เดิม — doc ควรอัปเดต
 
 > **เรื่องสื่อ (Media):** เซอร์วิสนี้ **ไม่ได้** เรียก AI Media เอง เราเพียงสร้าง `mediaRequest`
 > ให้ ส่วน backend จะเป็นผู้ส่งต่อ (พร้อมเติม `callback_url`) ไปยัง AI Media

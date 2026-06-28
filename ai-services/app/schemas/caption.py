@@ -52,6 +52,9 @@ class MediaRequest(BaseModel):
     aspect_ratio: str
     style: str
     negative_prompt: str
+    # Top-level `prompt` (first scene). The AI Media image branch reads this,
+    # while the video branch reads `scenes[]`. We send both for compatibility.
+    prompt: str
     scenes: list[Scene]
     metadata: dict
     # `callback_url` is intentionally omitted — the backend fills it in before

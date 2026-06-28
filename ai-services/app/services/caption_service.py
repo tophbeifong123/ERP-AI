@@ -22,7 +22,7 @@ MAX_SCENE_CHARS = 600
 
 # AI Media payload defaults. NOTE: confirm valid `style` values + aspect ratios
 # with the AI Media teammate — these are best-guess defaults.
-ASPECT_RATIO = {"image": "5:4", "short_video": "9:16"}
+ASPECT_RATIO = {"image": "4:5", "short_video": "9:16"}
 VIDEO_SCENE_COUNT = 4   # each scene ~8s (AI Media limit) -> ~32s total
 IMAGE_SCENE_COUNT = 1
 DEFAULT_STYLE = "cinematic_fantasy"
@@ -110,6 +110,7 @@ def _build_media_request(req: CaptionRequest, scene_prompts: list[str]) -> Media
         aspect_ratio=ASPECT_RATIO[req.media_type],
         style=DEFAULT_STYLE,
         negative_prompt=NEGATIVE_PROMPT,
+        prompt=cleaned[0] if cleaned else "",   # image branch reads this
         scenes=scenes,
         metadata={"campaign_id": req.post_id},
     )

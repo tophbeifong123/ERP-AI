@@ -81,9 +81,11 @@ def test_image_media_request_single_scene(monkeypatch):
     result = caption_service.build_caption(_request(media_type="image"))
     mr = result.media_request
     assert mr.content_type == "image"
-    assert mr.aspect_ratio == "5:4"
+    assert mr.aspect_ratio == "4:5"
     assert len(mr.scenes) == 1
     assert mr.scenes[0].prompt.startswith("A photorealistic")
+    # top-level prompt (read by the AI Media image branch) mirrors the scene
+    assert mr.prompt == mr.scenes[0].prompt
     assert mr.negative_prompt == caption_service.NEGATIVE_PROMPT
 
 
@@ -126,6 +128,7 @@ def test_process_caption_callback_has_snakecase_media_request(monkeypatch):
     assert result["caption"] == "โพสต์ทดสอบ #ทดสอบ"
     mr = result["mediaRequest"]            # camelCase envelope key
     assert mr["content_type"] == "image"   # snake_case AI Media contents
+    assert mr["prompt"] == "A cozy cafe scene, no text"          # image branch field
     assert mr["scenes"][0]["prompt"] == "A cozy cafe scene, no text"
     assert mr["metadata"]["campaign_id"] == "post-123"
 
