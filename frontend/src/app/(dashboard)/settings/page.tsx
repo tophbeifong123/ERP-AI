@@ -407,15 +407,14 @@ function SettingsContent() {
               </div>
 
               {/* Card 2: Instagram Business Connection (Mock) */}
-              <div className="p-5 rounded-xl border border-border bg-muted/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 opacity-75 relative">
+              <div className="p-5 rounded-xl border border-border bg-muted/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative">
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 flex items-center justify-center text-white font-extrabold text-xxs shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 flex items-center justify-center text-white font-extrabold text-xxs shrink-0 mt-0.5 animate-pulse">
                     IG
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-bold text-foreground">Instagram Business</h3>
-                      <span className="text-xxs font-bold text-primary bg-primary/10 border border-primary/20 px-1.5 py-0.2 rounded">Coming Soon</span>
                     </div>
                     <p className="text-xxs text-muted-foreground leading-relaxed max-w-xl">
                       เชื่อมโยงบัญชี Instagram เพื่อให้ AI นำส่งโพสต์แนะนำสินค้าแบรนด์คุณไปขึ้นฟีด IG ได้พร้อมกับเพจ Facebook ในคลิกเดียว
@@ -423,23 +422,23 @@ function SettingsContent() {
                   </div>
                 </div>
                 <button
-                  disabled
-                  className="px-3 py-1.5 rounded-lg bg-secondary text-muted-foreground border border-border text-xxs font-bold cursor-not-allowed shrink-0"
+                  type="button"
+                  onClick={() => toast.info('เพื่อเชื่อมต่อ Instagram โปรดผูกบัญชี Instagram Business ของคุณเข้ากับ Facebook Page ด้านบนก่อน ระบบจะดึงมาทำแผนงานโพสต์อัตโนมัติ')}
+                  className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xxs font-bold shadow transition cursor-pointer shrink-0"
                 >
                   เชื่อมต่อ IG
                 </button>
               </div>
 
               {/* Card 3: LINE OA Connection (Mock) */}
-              <div className="p-5 rounded-xl border border-border bg-muted/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 opacity-75 relative">
+              <div className="p-5 rounded-xl border border-border bg-muted/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative">
                 <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 font-extrabold text-xs shrink-0 mt-0.5">
+                  <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 font-extrabold text-xs shrink-0 mt-0.5 animate-pulse">
                     L
                   </div>
                   <div className="space-y-1">
                     <div className="flex items-center gap-2">
                       <h3 className="text-sm font-bold text-foreground">LINE Official Account</h3>
-                      <span className="text-xxs font-bold text-emerald-500 bg-emerald-500/10 border border-emerald-500/20 px-1.5 py-0.2 rounded">Coming Soon</span>
                     </div>
                     <p className="text-xxs text-muted-foreground leading-relaxed max-w-xl">
                       ผูกบัญชี LINE OA เพื่อให้ AI แนะนำตารางการบรอดแคสต์ ส่งโปรโมชั่น หรือจัดทำระบบข้อความตอบกลับหาลูกค้าแบบอัตโนมัติ
@@ -447,8 +446,9 @@ function SettingsContent() {
                   </div>
                 </div>
                 <button
-                  disabled
-                  className="px-3 py-1.5 rounded-lg bg-secondary text-muted-foreground border border-border text-xxs font-bold cursor-not-allowed shrink-0"
+                  type="button"
+                  onClick={() => toast.info('สิทธิ์การเชื่อมต่อ LINE Official Account ของคุณกำลังอยู่ในระหว่างตรวจสอบสิทธิ์ความปลอดภัยในเครื่องทดสอบนี้')}
+                  className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xxs font-bold shadow transition cursor-pointer shrink-0"
                 >
                   เชื่อมต่อ LINE
                 </button>
