@@ -3,7 +3,10 @@ import { ValidationPipe, Logger } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { AppModule } from './app.module';
 import { AllExceptionsFilter } from './common/filters';
-import { RequestIdInterceptor, LoggingInterceptor } from './common/interceptors';
+import {
+  RequestIdInterceptor,
+  LoggingInterceptor,
+} from './common/interceptors';
 
 async function bootstrap() {
   const logger = new Logger('Bootstrap');
@@ -11,7 +14,8 @@ async function bootstrap() {
 
   const configService = app.get(ConfigService);
   const port = configService.get<number>('app.port') || 3000;
-  const frontendUrl = configService.get<string>('app.frontendUrl') || 'http://localhost:3001';
+  const frontendUrl =
+    configService.get<string>('app.frontendUrl') || 'http://localhost:3001';
 
   app.enableCors({
     origin: [frontendUrl, 'http://localhost:3000'],
@@ -27,7 +31,10 @@ async function bootstrap() {
   );
 
   app.useGlobalFilters(new AllExceptionsFilter());
-  app.useGlobalInterceptors(new RequestIdInterceptor(), new LoggingInterceptor());
+  app.useGlobalInterceptors(
+    new RequestIdInterceptor(),
+    new LoggingInterceptor(),
+  );
 
   await app.listen(port);
   logger.log(`Application running on port ${port}`);

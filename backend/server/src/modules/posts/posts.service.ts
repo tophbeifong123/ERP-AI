@@ -1,9 +1,18 @@
-import { Injectable, Logger, NotFoundException, BadRequestException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  NotFoundException,
+  BadRequestException,
+} from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
-import { Post, PostStatus, RejectionReason } from '../../database/entities/post.entity';
+import {
+  Post,
+  PostStatus,
+  RejectionReason,
+} from '../../database/entities/post.entity';
 import { PostMedia } from '../../database/entities/post-media.entity';
 import { PostFeaturedService } from '../../database/entities/post-featured-service.entity';
 import { Business } from '../../database/entities/business.entity';
@@ -37,7 +46,8 @@ export class PostsService {
   constructor(
     @InjectRepository(Post) private postRepo: Repository<Post>,
     @InjectRepository(PostMedia) private mediaRepo: Repository<PostMedia>,
-    @InjectRepository(PostFeaturedService) private featuredRepo: Repository<PostFeaturedService>,
+    @InjectRepository(PostFeaturedService)
+    private featuredRepo: Repository<PostFeaturedService>,
     @InjectRepository(Business) private businessRepo: Repository<Business>,
     @InjectRepository(AiJob) private jobRepo: Repository<AiJob>,
     @InjectQueue('caption') private captionQueue: Queue,
@@ -50,7 +60,10 @@ export class PostsService {
       where: { id: dto.businessId, ownerId, deletedAt: IsNull() },
     });
     if (!business) {
-      throw new NotFoundException({ message: 'Business not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Business not found',
+        error: 'not_found',
+      });
     }
 
     const post = this.postRepo.create({
@@ -67,7 +80,12 @@ export class PostsService {
 
     if (dto.mediaIds?.length) {
       const media = dto.mediaIds.map((fileId, idx) =>
-        this.mediaRepo.create({ postId: saved.id, fileId, kind: 'image', orderIndex: idx }),
+        this.mediaRepo.create({
+          postId: saved.id,
+          fileId,
+          kind: 'image',
+          orderIndex: idx,
+        }),
       );
       await this.mediaRepo.save(media);
     }
@@ -86,10 +104,17 @@ export class PostsService {
     return saved;
   }
 
-  async enqueueAiPipeline(postId: string): Promise<{ captionJobId: string; imageJobId: string; shortVideoJobId: string }> {
+  async enqueueAiPipeline(postId: string): Promise<{
+    captionJobId: string;
+    imageJobId: string;
+    shortVideoJobId: string;
+  }> {
     const post = await this.postRepo.findOne({ where: { id: postId } });
     if (!post) {
-      throw new NotFoundException({ message: 'Post not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Post not found',
+        error: 'not_found',
+      });
     }
 
     const captionJob = await this.jobRepo.save(
@@ -123,17 +148,35 @@ export class PostsService {
       }),
     );
 
-    await this.captionQueue.add('caption', { jobId: captionJob.id }, { jobId: captionJob.id });
-    await this.mediaQueue.add('image', { jobId: imageJob.id }, { jobId: imageJob.id });
-    await this.mediaQueue.add('short_video', { jobId: shortVideoJob.id }, { jobId: shortVideoJob.id });
+    await this.captionQueue.add(
+      'caption',
+      { jobId: captionJob.id },
+      { jobId: captionJob.id },
+    );
+    await this.mediaQueue.add(
+      'image',
+      { jobId: imageJob.id },
+      { jobId: imageJob.id },
+    );
+    await this.mediaQueue.add(
+      'short_video',
+      { jobId: shortVideoJob.id },
+      { jobId: shortVideoJob.id },
+    );
 
     if (post.status === 'draft') {
       post.status = 'generating';
       await this.postRepo.save(post);
     }
 
-    this.logger.log(`Enqueued AI pipeline for post ${postId}: caption=${captionJob.id}`);
-    return { captionJobId: captionJob.id, imageJobId: imageJob.id, shortVideoJobId: shortVideoJob.id };
+    this.logger.log(
+      `Enqueued AI pipeline for post ${postId}: caption=${captionJob.id}`,
+    );
+    return {
+      captionJobId: captionJob.id,
+      imageJobId: imageJob.id,
+      shortVideoJobId: shortVideoJob.id,
+    };
   }
 
   async list(filter: {
@@ -143,11 +186,17 @@ export class PostsService {
     from?: Date;
     to?: Date;
   }): Promise<Post[]> {
-    const qb = this.postRepo.createQueryBuilder('post').where('post.deletedAt IS NULL');
-    if (filter.businessId) qb.andWhere('post.businessId = :bid', { bid: filter.businessId });
-    if (filter.status) qb.andWhere('post.status = :status', { status: filter.status });
-    if (filter.postType) qb.andWhere('post.postType = :pt', { pt: filter.postType });
-    if (filter.from) qb.andWhere('post.createdAt >= :from', { from: filter.from });
+    const qb = this.postRepo
+      .createQueryBuilder('post')
+      .where('post.deletedAt IS NULL');
+    if (filter.businessId)
+      qb.andWhere('post.businessId = :bid', { bid: filter.businessId });
+    if (filter.status)
+      qb.andWhere('post.status = :status', { status: filter.status });
+    if (filter.postType)
+      qb.andWhere('post.postType = :pt', { pt: filter.postType });
+    if (filter.from)
+      qb.andWhere('post.createdAt >= :from', { from: filter.from });
     if (filter.to) qb.andWhere('post.createdAt <= :to', { to: filter.to });
     qb.orderBy('post.createdAt', 'DESC');
     return qb.getMany();
@@ -159,7 +208,10 @@ export class PostsService {
       relations: { media: true, aiJobs: true },
     });
     if (!post) {
-      throw new NotFoundException({ message: 'Post not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'Post not found',
+        error: 'not_found',
+      });
     }
     return post;
   }
@@ -174,7 +226,8 @@ export class PostsService {
     }
     if (dto.caption !== undefined) post.caption = dto.caption;
     if (dto.scheduledAt !== undefined) post.scheduledAt = dto.scheduledAt;
-    if (dto.approvalDeadline !== undefined) post.approvalDeadline = dto.approvalDeadline;
+    if (dto.approvalDeadline !== undefined)
+      post.approvalDeadline = dto.approvalDeadline;
     await this.postRepo.save(post);
 
     if (dto.featuredServiceIds) {
@@ -190,7 +243,16 @@ export class PostsService {
     return post;
   }
 
-  async transition(id: string, to: PostStatus, opts: { fbPostId?: string; reason?: RejectionReason; errorCode?: string; errorMessage?: string } = {}): Promise<Post> {
+  async transition(
+    id: string,
+    to: PostStatus,
+    opts: {
+      fbPostId?: string;
+      reason?: RejectionReason;
+      errorCode?: string;
+      errorMessage?: string;
+    } = {},
+  ): Promise<Post> {
     const post = await this.getOne(id);
     PostStateMachine.assertTransition(post.status, to);
     post.status = to;
@@ -221,7 +283,10 @@ export class PostsService {
     return this.transition(id, 'approved');
   }
 
-  async reject(id: string, reason: RejectionReason = 'user_rejected'): Promise<Post> {
+  async reject(
+    id: string,
+    reason: RejectionReason = 'user_rejected',
+  ): Promise<Post> {
     return this.transition(id, 'rejected', { reason });
   }
 

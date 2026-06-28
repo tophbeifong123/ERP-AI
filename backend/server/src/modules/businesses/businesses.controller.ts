@@ -15,7 +15,11 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { BusinessesService } from './businesses.service';
-import { CreateBusinessDto, UpdateAutoPostDto, UpdateBusinessDto } from './dto/business.dto';
+import {
+  CreateBusinessDto,
+  UpdateAutoPostDto,
+  UpdateBusinessDto,
+} from './dto/business.dto';
 import { OwnerGuard } from '../../common/guards/owner.guard';
 import { EmailVerifiedGuard } from '../../common/guards/email-verified.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -27,7 +31,9 @@ export class BusinessesController {
   constructor(private businessesService: BusinessesService) {}
 
   @Post()
-  @UseInterceptors(FileInterceptor('logo', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @UseInterceptors(
+    FileInterceptor('logo', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
   @HttpCode(HttpStatus.CREATED)
   async create(
     @CurrentUser('id') userId: string,
@@ -75,7 +81,9 @@ export class BusinessesController {
   @Post(':id/logo')
   @UseGuards(OwnerGuard)
   @ResourceType('business')
-  @UseInterceptors(FileInterceptor('logo', { limits: { fileSize: 5 * 1024 * 1024 } }))
+  @UseInterceptors(
+    FileInterceptor('logo', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
   @HttpCode(HttpStatus.CREATED)
   async uploadLogo(
     @Param('id', new ParseUUIDPipe()) id: string,

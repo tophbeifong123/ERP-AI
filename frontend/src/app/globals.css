@@ -51,8 +51,9 @@ a {
 }
 
 @theme inline {
-  --font-heading: var(--font-sans);
-  --font-sans: var(--font-sans);
+  --font-heading: ui-sans-serif, system-ui, sans-serif;
+  --font-sans: ui-sans-serif, system-ui, sans-serif;
+  --font-mono: ui-monospace, SFMono-Regular, Menlo, Monaco, Consolas, monospace;
   --color-sidebar-ring: var(--sidebar-ring);
   --color-sidebar-border: var(--sidebar-border);
   --color-sidebar-accent-foreground: var(--sidebar-accent-foreground);
@@ -90,14 +91,62 @@ a {
   --radius-xl: calc(var(--radius) * 1.4);
   --radius-2xl: calc(var(--radius) * 1.8);
   --radius-3xl: calc(var(--radius) * 2.2);
-  --radius-4xl: calc(var(--radius) * 2.6);
 }
 
 /* 
- * DEFAULT THEME (Dark Theme by Default - Obsidian & Indigo & Mint)
- * ออกแบบเพื่อลดความเมื่อยล้าทางสายตาและสื่อถึงความล้ำสมัยของ AI
+ * DEFAULT THEME (โหมดสว่างเริ่มต้น - Soft Snow & Clean Minimalist)
+ * ออกแบบให้ดูสะอาดตา สบายตา และใช้งานง่ายในทุกสภาพแสง
  */
 :root {
+  --background: oklch(0.985 0.002 240);         /* ขาวหิมะนุ่ม (Soft Snow) */
+  --foreground: oklch(0.145 0 0);               /* ดำถ่าน */
+  
+  --card: oklch(1 0 0);                         /* ขาวสะอาดหมดจด */
+  --card-foreground: oklch(0.145 0 0);
+  
+  --popover: oklch(1 0 0);
+  --popover-foreground: oklch(0.145 0 0);
+  
+  --primary: oklch(0.585 0.233 277.11);         /* ม่วงอินดิโก้ (AI & Tech Accent) */
+  --primary-foreground: oklch(0.985 0.002 240);
+  
+  --secondary: oklch(0.94 0.002 240);
+  --secondary-foreground: oklch(0.145 0 0);
+  
+  --muted: oklch(0.94 0.002 240);
+  --muted-foreground: oklch(0.45 0.002 240);     /* เทาจางสำหรับข้อความรอง */
+  
+  --accent: oklch(0.585 0.233 277.11 / 8%);
+  --accent-foreground: oklch(0.585 0.233 277.11);
+  
+  --destructive: oklch(0.577 0.245 27.325);     /* แดงสำหรับส่วนสำคัญ/ลบออก */
+  --destructive-foreground: oklch(0.985 0.002 240);
+  
+  --border: oklch(0.90 0.002 240);
+  --input: oklch(0.90 0.002 240);
+  --ring: oklch(0.585 0.233 277.11);
+  
+  --radius: 0.75rem;                            /* ขอบโค้งมนที่ดูทันสมัยยิ่งขึ้น */
+  
+  --sidebar: oklch(0.97 0.002 240);
+  --sidebar-foreground: oklch(0.145 0 0);
+  --sidebar-primary: oklch(0.585 0.233 277.11);
+  --sidebar-primary-foreground: oklch(0.985 0.002 240);
+  --sidebar-accent: oklch(0.90 0.002 240);
+  --sidebar-accent-foreground: oklch(0.145 0 0);
+  --sidebar-border: oklch(0.90 0.002 240);
+  --sidebar-ring: oklch(0.585 0.233 277.11);
+
+  /* ตัวแปรสำหรับกระจกฝ้ากึ่งโปร่งแสง (Glassmorphic) */
+  --glass-bg: oklch(1 0 0 / 60%);
+  --glass-border: oklch(0.145 0 0 / 8%);
+}
+
+/* 
+ * DARK THEME (โหมดมืดเสริม - Obsidian & Indigo & Mint)
+ * เปิดใช้งานโดยการใส่คลาส 'dark' เข้าไปที่ html/body element
+ */
+.dark {
   --background: oklch(0.11 0.012 255.43);       /* ดำน้ำเงินลึก (Obsidian Dark) */
   --foreground: oklch(0.985 0.002 240);         /* ขาวนวลสบายตา */
   
@@ -122,11 +171,9 @@ a {
   --destructive: oklch(0.60 0.22 25);           /* แดงหม่น */
   --destructive-foreground: oklch(0.985 0.002 240);
   
-  --border: oklch(1 0 0 / 8%);                  /* เส้นขอบขาวโปร่งแสง 8% หรูหรา */
+  --border: oklch(1 0 0 / 8%);                  /* เส้นขอบขาวโปร่งแสง 8% */
   --input: oklch(1 0 0 / 10%);
   --ring: oklch(0.585 0.233 277.11);
-  
-  --radius: 0.75rem;                            /* ขอบโค้งมนที่ดูทันสมัยยิ่งขึ้น */
   
   --sidebar: oklch(0.13 0.012 255.43);
   --sidebar-foreground: oklch(0.985 0.002 240);
@@ -136,48 +183,10 @@ a {
   --sidebar-accent-foreground: oklch(0.985 0.002 240);
   --sidebar-border: oklch(1 0 0 / 8%);
   --sidebar-ring: oklch(0.585 0.233 277.11);
-}
 
-/* 
- * LIGHT THEME (Optional - Clean Minimalist style)
- */
-.light {
-  --background: oklch(0.985 0.002 240);         /* ขาวหิมะนุ่ม (Soft Snow) */
-  --foreground: oklch(0.145 0 0);               /* ดำถ่าน */
-  
-  --card: oklch(1 0 0);                         /* ขาวหมดจด */
-  --card-foreground: oklch(0.145 0 0);
-  
-  --popover: oklch(1 0 0);
-  --popover-foreground: oklch(0.145 0 0);
-  
-  --primary: oklch(0.585 0.233 277.11);         /* ม่วงอินดิโก้ */
-  --primary-foreground: oklch(0.985 0.002 240);
-  
-  --secondary: oklch(0.94 0.002 240);
-  --secondary-foreground: oklch(0.145 0 0);
-  
-  --muted: oklch(0.94 0.002 240);
-  --muted-foreground: oklch(0.45 0.002 240);
-  
-  --accent: oklch(0.585 0.233 277.11 / 8%);
-  --accent-foreground: oklch(0.585 0.233 277.11);
-  
-  --destructive: oklch(0.577 0.245 27.325);
-  --destructive-foreground: oklch(0.985 0.002 240);
-  
-  --border: oklch(0.90 0.002 240);
-  --input: oklch(0.90 0.002 240);
-  --ring: oklch(0.585 0.233 277.11);
-  
-  --sidebar: oklch(0.97 0.002 240);
-  --sidebar-foreground: oklch(0.145 0 0);
-  --sidebar-primary: oklch(0.585 0.233 277.11);
-  --sidebar-primary-foreground: oklch(0.985 0.002 240);
-  --sidebar-accent: oklch(0.90 0.002 240);
-  --sidebar-accent-foreground: oklch(0.145 0 0);
-  --sidebar-border: oklch(0.90 0.002 240);
-  --sidebar-ring: oklch(0.585 0.233 277.11);
+  /* ตัวแปรสำหรับกระจกฝ้ากึ่งโปร่งแสง (Glassmorphic) */
+  --glass-bg: oklch(0.14 0.012 255.43 / 60%);
+  --glass-border: oklch(1 0 0 / 8%);
 }
 
 @layer base {
@@ -194,7 +203,7 @@ a {
 
 /* Utility classes สำหรับกระจกฝ้าและการเรืองแสง (Glassmorphic utilities) */
 .glass-panel {
-  @apply backdrop-blur-xl bg-neutral-900/60 border border-white/5;
+  @apply backdrop-blur-xl bg-[var(--glass-bg)] border border-[var(--glass-border)];
 }
 
 .glow-indigo {

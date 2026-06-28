@@ -38,6 +38,10 @@ export class JwtStrategy extends PassportStrategy(Strategy) {
     if (!user || user.deletedAt) {
       throw new UnauthorizedException('User not found');
     }
-    return { id: user.id, email: user.email, emailVerifiedAt: user.emailVerifiedAt };
+    return {
+      id: user.id,
+      email: user.email,
+      emailVerifiedAt: user.emailVerifiedAt,
+    };
   }
 }

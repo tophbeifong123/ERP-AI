@@ -28,7 +28,9 @@ export class EmailVerification {
   @CreateDateColumn({ name: 'created_at', type: 'timestamptz' })
   createdAt: Date;
 
-  @ManyToOne(() => User, (user) => user.emailVerifications, { onDelete: 'CASCADE' })
+  @ManyToOne(() => User, (user) => user.emailVerifications, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'user_id' })
   user: User;
 }

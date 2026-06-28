@@ -12,7 +12,10 @@ import {
 import { Business } from './business.entity';
 
 @Entity('facebook_pages')
-@Index(['businessId', 'fbPageId'], { unique: true, where: 'deleted_at IS NULL' })
+@Index(['businessId', 'fbPageId'], {
+  unique: true,
+  where: 'deleted_at IS NULL',
+})
 @Index(['tokenExpiresAt'])
 export class FacebookPage {
   @PrimaryGeneratedColumn('uuid')
@@ -48,7 +51,9 @@ export class FacebookPage {
   @DeleteDateColumn({ name: 'deleted_at', type: 'timestamptz' })
   deletedAt: Date | null;
 
-  @ManyToOne(() => Business, (business) => business.facebookPages, { onDelete: 'CASCADE' })
+  @ManyToOne(() => Business, (business) => business.facebookPages, {
+    onDelete: 'CASCADE',
+  })
   @JoinColumn({ name: 'business_id' })
   business: Business;
 }

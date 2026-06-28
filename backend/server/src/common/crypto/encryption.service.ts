@@ -1,4 +1,9 @@
-import { Injectable, Logger, OnModuleInit, InternalServerErrorException } from '@nestjs/common';
+import {
+  Injectable,
+  Logger,
+  OnModuleInit,
+  InternalServerErrorException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { createCipheriv, createDecipheriv, randomBytes } from 'crypto';
 
@@ -32,13 +37,18 @@ export class EncryptionService implements OnModuleInit {
         `FB_TOKEN_ENCRYPTION_KEY must decode to 32 bytes (got ${this.key.length})`,
       );
     }
-    this.logger.log('EncryptionService initialised with 32-byte AES-256-GCM key');
+    this.logger.log(
+      'EncryptionService initialised with 32-byte AES-256-GCM key',
+    );
   }
 
   encrypt(plaintext: string): Buffer {
     const iv = randomBytes(IV_LENGTH);
     const cipher = createCipheriv(ALGORITHM, this.key, iv);
-    const ciphertext = Buffer.concat([cipher.update(plaintext, 'utf8'), cipher.final()]);
+    const ciphertext = Buffer.concat([
+      cipher.update(plaintext, 'utf8'),
+      cipher.final(),
+    ]);
     const authTag = cipher.getAuthTag();
 
     return Buffer.concat([iv, authTag, ciphertext]);
@@ -54,6 +64,9 @@ export class EncryptionService implements OnModuleInit {
 
     const decipher = createDecipheriv(ALGORITHM, this.key, iv);
     decipher.setAuthTag(authTag);
-    return Buffer.concat([decipher.update(ciphertext), decipher.final()]).toString('utf8');
+    return Buffer.concat([
+      decipher.update(ciphertext),
+      decipher.final(),
+    ]).toString('utf8');
   }
 }

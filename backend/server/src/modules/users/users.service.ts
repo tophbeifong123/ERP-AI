@@ -8,13 +8,17 @@ import { RefreshToken } from '../../database/entities/refresh-token.entity';
 export class UsersService {
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
-    @InjectRepository(RefreshToken) private refreshTokenRepo: Repository<RefreshToken>,
+    @InjectRepository(RefreshToken)
+    private refreshTokenRepo: Repository<RefreshToken>,
   ) {}
 
   async getMe(userId: string) {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user || user.deletedAt) {
-      throw new NotFoundException({ message: 'User not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'User not found',
+        error: 'not_found',
+      });
     }
     return {
       id: user.id,
@@ -27,7 +31,10 @@ export class UsersService {
   async deleteMe(userId: string): Promise<void> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user || user.deletedAt) {
-      throw new NotFoundException({ message: 'User not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'User not found',
+        error: 'not_found',
+      });
     }
     await this.userRepo.softDelete(userId);
     await this.refreshTokenRepo

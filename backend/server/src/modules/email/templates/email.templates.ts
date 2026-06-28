@@ -6,7 +6,9 @@ const escape = (s: string): string =>
     .replace(/"/g, '&quot;')
     .replace(/'/g, '&#39;');
 
-export const renderVerifyEmail = (link: string): { subject: string; html: string; text: string } => ({
+export const renderVerifyEmail = (
+  link: string,
+): { subject: string; html: string; text: string } => ({
   subject: 'Verify your ERP-AI email',
   html: `<!doctype html>
 <html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#222;max-width:560px;margin:auto;padding:24px">
@@ -20,7 +22,9 @@ export const renderVerifyEmail = (link: string): { subject: string; html: string
   text: `Welcome to ERP-AI\n\nVerify your email: ${link}\n\nThis link expires in 24 hours.`,
 });
 
-export const renderResetPassword = (link: string): { subject: string; html: string; text: string } => ({
+export const renderResetPassword = (
+  link: string,
+): { subject: string; html: string; text: string } => ({
   subject: 'Reset your ERP-AI password',
   html: `<!doctype html>
 <html><body style="font-family:Arial,sans-serif;line-height:1.6;color:#222;max-width:560px;margin:auto;padding:24px">
@@ -43,7 +47,9 @@ export interface PostReadyContext {
   approvalDeadline?: Date | string | null;
 }
 
-export const renderPostReady = (ctx: PostReadyContext): { subject: string; html: string; text: string } => {
+export const renderPostReady = (
+  ctx: PostReadyContext,
+): { subject: string; html: string; text: string } => {
   const subject = `New post ready for review — ${ctx.businessName}`;
   const deadline = ctx.approvalDeadline
     ? `<p>Auto-rejection deadline: <strong>${escape(new Date(ctx.approvalDeadline).toISOString())}</strong></p>`
@@ -71,9 +77,12 @@ export interface PostExpiredContext {
   reviewUrl: string;
 }
 
-export const renderPostExpired = (ctx: PostExpiredContext): { subject: string; html: string; text: string } => {
+export const renderPostExpired = (
+  ctx: PostExpiredContext,
+): { subject: string; html: string; text: string } => {
   const subject = `Post expired — ${ctx.businessName}`;
-  const reasonText = ctx.reason === 'timeout' ? 'auto-rejected (approval timeout)' : 'rejected';
+  const reasonText =
+    ctx.reason === 'timeout' ? 'auto-rejected (approval timeout)' : 'rejected';
   return {
     subject,
     html: `<!doctype html>
@@ -97,7 +106,9 @@ export interface PostPostedContext {
   viewUrl: string;
 }
 
-export const renderPostPosted = (ctx: PostPostedContext): { subject: string; html: string; text: string } => {
+export const renderPostPosted = (
+  ctx: PostPostedContext,
+): { subject: string; html: string; text: string } => {
   const subject = `Post published to ${ctx.pageName}`;
   return {
     subject,
@@ -123,7 +134,9 @@ export interface PostFailedContext {
   reviewUrl: string;
 }
 
-export const renderPostFailed = (ctx: PostFailedContext): { subject: string; html: string; text: string } => {
+export const renderPostFailed = (
+  ctx: PostFailedContext,
+): { subject: string; html: string; text: string } => {
   const subject = `Post failed — ${ctx.businessName}`;
   return {
     subject,

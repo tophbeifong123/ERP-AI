@@ -1,4 +1,11 @@
-import { ExceptionFilter, Catch, ArgumentsHost, HttpException, HttpStatus, Logger } from '@nestjs/common';
+import {
+  ExceptionFilter,
+  Catch,
+  ArgumentsHost,
+  HttpException,
+  HttpStatus,
+  Logger,
+} from '@nestjs/common';
 import type { Request, Response } from 'express';
 
 @Catch()
@@ -29,7 +36,10 @@ export class AllExceptionsFilter implements ExceptionFilter {
       }
     } else if (exception instanceof Error) {
       message = exception.message;
-      this.logger.error({ err: exception, path: request.path }, 'Unhandled exception');
+      this.logger.error(
+        { err: exception, path: request.path },
+        'Unhandled exception',
+      );
     }
 
     const responseBody: Record<string, unknown> = {

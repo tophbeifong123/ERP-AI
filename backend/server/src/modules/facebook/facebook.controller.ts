@@ -32,7 +32,9 @@ export class FacebookController {
     @Res() res: Response,
   ) {
     if (!businessId) {
-      return res.status(400).json({ message: 'businessId is required', error: 'bad_request' });
+      return res
+        .status(400)
+        .json({ message: 'businessId is required', error: 'bad_request' });
     }
     const url = await this.facebookService.buildOAuthUrl(userId, businessId);
     return res.redirect(url);
@@ -50,11 +52,18 @@ export class FacebookController {
       return res.redirect(`${frontendUrl}/businesses?fb=missing_params`);
     }
     try {
-      const { businessId } = await this.facebookService.handleCallback(code, state);
-      return res.redirect(`${frontendUrl}/businesses/${businessId}?fb=connected`);
+      const { businessId } = await this.facebookService.handleCallback(
+        code,
+        state,
+      );
+      return res.redirect(
+        `${frontendUrl}/businesses/${businessId}?fb=connected`,
+      );
     } catch (err) {
       const msg = err instanceof Error ? err.message : 'callback_failed';
-      return res.redirect(`${frontendUrl}/businesses?fb=error&msg=${encodeURIComponent(msg)}`);
+      return res.redirect(
+        `${frontendUrl}/businesses?fb=error&msg=${encodeURIComponent(msg)}`,
+      );
     }
   }
 
@@ -64,7 +73,10 @@ export class FacebookController {
     @Query('businessId', new ParseUUIDPipe()) businessId: string,
     @CurrentUser('id') userId: string,
   ) {
-    const pages = await this.facebookService.listPagesForUser(userId, businessId);
+    const pages = await this.facebookService.listPagesForUser(
+      userId,
+      businessId,
+    );
     return { pages };
   }
 
@@ -77,7 +89,11 @@ export class FacebookController {
     @CurrentUser('id') userId: string,
     @Body() dto: ConnectPageDto,
   ) {
-    const facebookPage = await this.facebookService.connectPage(userId, businessId, dto.fbPageId);
+    const facebookPage = await this.facebookService.connectPage(
+      userId,
+      businessId,
+      dto.fbPageId,
+    );
     return { facebookPage };
   }
 

@@ -26,21 +26,38 @@ const queueFactory = (config: ConfigService) => ({
     AuthConfigModule,
     CommonModule,
     TypeOrmModule.forFeature([AiJob, Post, FacebookPage, RefreshToken]),
-    BullModule.registerQueueAsync(
-      { name: 'caption', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
-    ),
-    BullModule.registerQueueAsync(
-      { name: 'media', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
-    ),
-    BullModule.registerQueueAsync(
-      { name: 'dispatch-post', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
-    ),
-    BullModule.registerQueueAsync(
-      { name: 'refresh-token-cleanup', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
-    ),
+    BullModule.registerQueueAsync({
+      name: 'caption',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: queueFactory,
+    }),
+    BullModule.registerQueueAsync({
+      name: 'media',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: queueFactory,
+    }),
+    BullModule.registerQueueAsync({
+      name: 'dispatch-post',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: queueFactory,
+    }),
+    BullModule.registerQueueAsync({
+      name: 'refresh-token-cleanup',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: queueFactory,
+    }),
     PostsModule,
   ],
-  providers: [CaptionProcessor, MediaProcessor, DispatchPostProcessor, RefreshTokenProcessor],
+  providers: [
+    CaptionProcessor,
+    MediaProcessor,
+    DispatchPostProcessor,
+    RefreshTokenProcessor,
+  ],
   exports: [BullModule],
 })
 export class JobsModule {}

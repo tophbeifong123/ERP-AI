@@ -73,7 +73,9 @@ export class CaptionProcessor extends WorkerHost {
         throw new Error('AI caption service did not return caption');
       }
 
-      const updatedPost = await this.postRepo.findOne({ where: { id: post.id } });
+      const updatedPost = await this.postRepo.findOne({
+        where: { id: post.id },
+      });
       if (updatedPost) {
         updatedPost.caption = data.caption;
         if (updatedPost.status === 'draft') {

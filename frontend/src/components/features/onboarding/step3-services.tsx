@@ -4,7 +4,7 @@
 import React, { useState } from 'react';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
-import { ShoppingBag, Plus, Trash2, X, Upload, Loader2 } from 'lucide-react';
+import { ChevronLeft, ShoppingBag, Plus, Trash2, X, Upload, Loader2 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { Service } from '@/core/types/service';
@@ -104,13 +104,13 @@ export default function Step3Services({
       <div className="space-y-6">
         <div className="flex justify-between items-start">
           <div>
-            <h2 className="text-xl font-bold text-white mb-1">คลังความรู้บริการและสินค้า</h2>
+            <h2 className="text-xl font-bold text-foreground mb-1">คลังความรู้บริการและสินค้า</h2>
             <p className="text-sm text-muted-foreground">ป้อนข้อมูลสินค้าเพื่อป้อนคลังความรู้สำหรับ AI ในการหยิบเขียนโปรโมทสะกดใจลูกค้า</p>
           </div>
           <button
             type="button"
             onClick={() => setShowAddServiceModal(true)}
-            className="px-3 py-1.5 rounded-lg bg-indigo-600 hover:bg-indigo-700 text-xs font-semibold text-white flex items-center gap-1 transition cursor-pointer"
+            className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-xs font-semibold text-white flex items-center gap-1 transition cursor-pointer"
           >
             <Plus className="w-4 h-4" />
             เพิ่มสินค้า
@@ -120,18 +120,18 @@ export default function Step3Services({
         {/* Service list container */}
         <div className="space-y-3 max-h-[350px] overflow-y-auto pr-1">
           {services.length === 0 ? (
-            <div className="flex flex-col items-center justify-center p-8 border border-dashed border-white/10 rounded-xl bg-neutral-900/10 text-center gap-2">
+            <div className="flex flex-col items-center justify-center p-8 border border-dashed border-border rounded-xl bg-muted/20 text-center gap-2">
               <ShoppingBag className="w-8 h-8 text-muted-foreground" />
-              <span className="text-sm font-semibold text-white">ยังไม่มีสินค้าในแค็ตตาล็อก</span>
+              <span className="text-sm font-semibold text-foreground">ยังไม่มีสินค้าในแค็ตตาล็อก</span>
               <span className="text-xs text-muted-foreground">กรุณาป้อนข้อมูลสินค้าหลักหรือสินค้าโปรโมชั่นอย่างน้อย 1 ชิ้น</span>
             </div>
           ) : (
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
               {services.map((item) => (
-                <div key={item.id} className="p-4 rounded-xl border border-white/5 bg-neutral-900/40 flex items-start justify-between gap-3 relative">
+                <div key={item.id} className="p-4 rounded-xl border border-border bg-muted/20 flex items-start justify-between gap-3 relative">
                   <div className="flex gap-3">
                     {/* Image preview placeholder */}
-                    <div className="w-12 h-12 rounded-lg border border-white/10 bg-neutral-950 shrink-0 flex items-center justify-center overflow-hidden">
+                    <div className="w-12 h-12 rounded-lg border border-border bg-background shrink-0 flex items-center justify-center overflow-hidden">
                       {item.image?.publicUrl ? (
                         <img src={item.image.publicUrl} alt={item.name} className="w-full h-full object-cover" />
                       ) : (
@@ -139,9 +139,9 @@ export default function Step3Services({
                       )}
                     </div>
                     <div>
-                      <span className="block text-sm font-bold text-white line-clamp-1">{item.name}</span>
+                      <span className="block text-sm font-bold text-foreground line-clamp-1">{item.name}</span>
                       <span className="block text-xs text-muted-foreground line-clamp-1 mb-1">{item.description || 'ไม่มีคำอธิบาย'}</span>
-                      <span className="text-xs font-extrabold text-indigo-400">
+                      <span className="text-xs font-extrabold text-primary">
                         {(Number(item.priceMinor) / 100).toLocaleString('th-TH')} THB
                       </span>
                     </div>
@@ -162,12 +162,14 @@ export default function Step3Services({
       </div>
 
       {/* Step navigation */}
-      <div className="pt-6 flex justify-between">
+      <div className="pt-6 flex flex-col-reverse gap-3 sm:flex-row sm:justify-between">
         <button
           type="button"
           onClick={onBack}
-          className="px-4 py-2 rounded-lg border border-white/10 text-sm font-semibold text-white hover:bg-white/5 cursor-pointer transition"
+          disabled={loading}
+          className="inline-flex items-center justify-center gap-1.5 px-4 py-2 rounded-lg border border-border text-sm font-semibold text-foreground hover:bg-muted disabled:opacity-50 cursor-pointer transition"
         >
+          <ChevronLeft className="w-4 h-4" />
           ย้อนกลับ
         </button>
         
@@ -186,7 +188,7 @@ export default function Step3Services({
           <div className="max-w-md w-full glass-panel glow-indigo rounded-2xl p-6 shadow-2xl animate-scale-up space-y-4">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-lg font-bold text-white">เพิ่มสินค้า/บริการใหม่</h3>
+                <h3 className="text-lg font-bold text-foreground">เพิ่มสินค้า/บริการใหม่</h3>
                 <p className="text-xs text-muted-foreground">ป้อนรายละเอียดคลังความรู้สำหรับประมวลผลโพสต์</p>
               </div>
               <button 
@@ -197,7 +199,7 @@ export default function Step3Services({
                   setServiceImageFile(null);
                   setServiceImagePreview(null);
                 }} 
-                className="text-muted-foreground hover:text-white p-1 cursor-pointer"
+                className="text-muted-foreground hover:text-foreground p-1 cursor-pointer"
               >
                 <X className="w-5 h-5" />
               </button>
@@ -206,7 +208,7 @@ export default function Step3Services({
             <form onSubmit={handleSubmitService(onSubmitService)} className="space-y-4">
               {/* Product Image */}
               <div className="flex items-center gap-3">
-                <div className="relative w-14 h-14 rounded-lg border border-white/10 bg-neutral-950 flex items-center justify-center overflow-hidden shrink-0">
+                <div className="relative w-14 h-14 rounded-lg border border-border bg-background flex items-center justify-center overflow-hidden shrink-0">
                   {serviceImagePreview ? (
                     <img src={serviceImagePreview} alt="Product Preview" className="w-full h-full object-cover" />
                   ) : (
@@ -214,8 +216,8 @@ export default function Step3Services({
                   )}
                 </div>
                 <div className="flex-1 text-left">
-                  <span className="block text-xs font-semibold text-white mb-1">รูปภาพประกอบสินค้า</span>
-                  <label className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-white/5 hover:bg-white/10 border border-white/10 text-xxs font-semibold text-white cursor-pointer transition">
+                  <span className="block text-xs font-semibold text-foreground mb-1">รูปภาพประกอบสินค้า</span>
+                  <label className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-md bg-secondary hover:bg-secondary/80 border border-border text-xxs font-semibold text-foreground cursor-pointer transition">
                     <Upload className="w-3 h-3" />
                     เลือกรูปภาพ
                     <input type="file" accept="image/*" className="hidden" onChange={handleServiceImageChange} />
@@ -225,12 +227,12 @@ export default function Step3Services({
 
               {/* Product Name */}
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-white">ชื่อสินค้า/บริการ <span className="text-red-500">*</span></label>
+                <label className="text-xs font-semibold text-foreground">ชื่อสินค้า/บริการ <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   {...registerService('name')}
                   placeholder="เช่น แกงไตปลาสูตรเผ็ดร้อน"
-                  className="w-full px-3 py-2 rounded-lg border border-white/5 bg-neutral-955 text-xs text-white outline-none focus:border-primary"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                 />
                 {serviceErrors.name && (
                   <p className="text-xxs text-destructive mt-0.5">{serviceErrors.name.message}</p>
@@ -239,12 +241,12 @@ export default function Step3Services({
 
               {/* Product Price */}
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-white">ราคาเสนอขาย (บาท) <span className="text-red-500">*</span></label>
+                <label className="text-xs font-semibold text-foreground">ราคาเสนอขาย (บาท) <span className="text-red-500">*</span></label>
                 <input
                   type="text"
                   {...registerService('price')}
                   placeholder="เช่น 120.00"
-                  className="w-full px-3 py-2 rounded-lg border border-white/5 bg-neutral-955 text-xs text-white outline-none focus:border-primary"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
                 />
                 {serviceErrors.price && (
                   <p className="text-xxs text-destructive mt-0.5">{serviceErrors.price.message}</p>
@@ -253,12 +255,12 @@ export default function Step3Services({
 
               {/* Product Description */}
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-white">รายละเอียดหรือคำโปรยสินค้า</label>
+                <label className="text-xs font-semibold text-foreground">รายละเอียดหรือคำโปรยสินค้า</label>
                 <textarea
                   rows={3}
                   {...registerService('description')}
                   placeholder="เช่น แกงไตปลาใต้แท้สูตรโบราณ รสเข้มข้นจัดจ้าน เครื่องแกงทำเองส่งตรงจากนครศรีธรรมราช ปริมาณ 250g..."
-                  className="w-full px-3 py-2 rounded-lg border border-white/5 bg-neutral-955 text-xs text-white outline-none focus:border-primary resize-none"
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none"
                 />
               </div>
 
@@ -271,7 +273,7 @@ export default function Step3Services({
                     setServiceImageFile(null);
                     setServiceImagePreview(null);
                   }}
-                  className="px-4 py-1.5 rounded-lg border border-white/10 text-xs font-semibold text-white hover:bg-white/5 transition cursor-pointer"
+                  className="px-4 py-1.5 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-muted transition cursor-pointer"
                 >
                   ยกเลิก
                 </button>

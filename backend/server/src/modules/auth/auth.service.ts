@@ -36,18 +36,28 @@ export class AuthService {
 
   constructor(
     @InjectRepository(User) private userRepo: Repository<User>,
-    @InjectRepository(RefreshToken) private refreshTokenRepo: Repository<RefreshToken>,
-    @InjectRepository(EmailVerification) private emailVerificationRepo: Repository<EmailVerification>,
-    @InjectRepository(PasswordReset) private passwordResetRepo: Repository<PasswordReset>,
+    @InjectRepository(RefreshToken)
+    private refreshTokenRepo: Repository<RefreshToken>,
+    @InjectRepository(EmailVerification)
+    private emailVerificationRepo: Repository<EmailVerification>,
+    @InjectRepository(PasswordReset)
+    private passwordResetRepo: Repository<PasswordReset>,
     private tokenService: TokenService,
     private emailService: EmailService,
     private configService: ConfigService,
   ) {}
 
-  async register(email: string, password: string, meta?: { userAgent?: string; ip?: string }): Promise<{ user: { id: string; email: string } }> {
+  async register(
+    email: string,
+    password: string,
+    meta?: { userAgent?: string; ip?: string },
+  ): Promise<{ user: { id: string; email: string } }> {
     const existing = await this.userRepo.findOne({ where: { email } });
     if (existing && !existing.deletedAt) {
-      throw new ConflictException({ message: 'Email already registered', error: 'email_taken' });
+      throw new ConflictException({
+        message: 'Email already registered',
+        error: 'email_taken',
+      });
     }
 
     const passwordHash = await argon2.hash(password, {
@@ -64,7 +74,9 @@ export class AuthService {
       existing.emailVerifiedAt = null;
       user = await this.userRepo.save(existing);
     } else {
-      user = await this.userRepo.save(this.userRepo.create({ email, passwordHash }));
+      user = await this.userRepo.save(
+        this.userRepo.create({ email, passwordHash }),
+      );
     }
 
     const token = randomToken();
@@ -88,21 +100,34 @@ export class AuthService {
   ): Promise<AuthResult> {
     const user = await this.userRepo.findOne({ where: { email } });
     if (!user || user.deletedAt) {
-      throw new UnauthorizedException({ message: 'Invalid credentials', error: 'invalid_credentials' });
+      throw new UnauthorizedException({
+        message: 'Invalid credentials',
+        error: 'invalid_credentials',
+      });
     }
 
     const ok = await argon2.verify(user.passwordHash, password);
     if (!ok) {
-      throw new UnauthorizedException({ message: 'Invalid credentials', error: 'invalid_credentials' });
+      throw new UnauthorizedException({
+        message: 'Invalid credentials',
+        error: 'invalid_credentials',
+      });
     }
 
     if (!user.emailVerifiedAt) {
-      throw new ForbiddenException({ message: 'Email not verified', error: 'email_not_verified' });
+      throw new ForbiddenException({
+        message: 'Email not verified',
+        error: 'email_not_verified',
+      });
     }
 
     const tokens = await this.issueTokens(user, meta);
     return {
-      user: { id: user.id, email: user.email, emailVerifiedAt: user.emailVerifiedAt },
+      user: {
+        id: user.id,
+        email: user.email,
+        emailVerifiedAt: user.emailVerifiedAt,
+      },
       ...tokens,
     };
   }
@@ -115,28 +140,44 @@ export class AuthService {
     try {
       payload = this.tokenService.verifyRefreshToken(refreshToken);
     } catch {
-      throw new UnauthorizedException({ message: 'Invalid or expired refresh token', error: 'invalid_token' });
+      throw new UnauthorizedException({
+        message: 'Invalid or expired refresh token',
+        error: 'invalid_token',
+      });
     }
 
     const tokenHash = sha256(refreshToken);
-    const stored = await this.refreshTokenRepo.findOne({ where: { tokenHash } });
+    const stored = await this.refreshTokenRepo.findOne({
+      where: { tokenHash },
+    });
     if (!stored || stored.userId !== payload.sub) {
-      throw new UnauthorizedException({ message: 'Invalid refresh token', error: 'invalid_token' });
+      throw new UnauthorizedException({
+        message: 'Invalid refresh token',
+        error: 'invalid_token',
+      });
     }
     if (stored.revokedAt) {
-      this.logger.warn(`Refresh token reuse detected for user ${stored.userId}, revoking chain`);
+      this.logger.warn(
+        `Refresh token reuse detected for user ${stored.userId}, revoking chain`,
+      );
       await this.refreshTokenRepo
         .createQueryBuilder()
         .update(RefreshToken)
         .set({ revokedAt: new Date() })
         .where('user_id = :uid AND revoked_at IS NULL', { uid: stored.userId })
         .execute();
-      throw new UnauthorizedException({ message: 'Refresh token reuse detected', error: 'invalid_token' });
+      throw new UnauthorizedException({
+        message: 'Refresh token reuse detected',
+        error: 'invalid_token',
+      });
     }
 
     const user = await this.userRepo.findOne({ where: { id: stored.userId } });
     if (!user || user.deletedAt) {
-      throw new UnauthorizedException({ message: 'User not found', error: 'invalid_token' });
+      throw new UnauthorizedException({
+        message: 'User not found',
+        error: 'invalid_token',
+      });
     }
 
     const newTokens = await this.issueTokens(user, meta);
@@ -147,7 +188,9 @@ export class AuthService {
   async logout(refreshToken: string): Promise<void> {
     if (!refreshToken) return;
     const tokenHash = sha256(refreshToken);
-    const stored = await this.refreshTokenRepo.findOne({ where: { tokenHash } });
+    const stored = await this.refreshTokenRepo.findOne({
+      where: { tokenHash },
+    });
     if (stored && !stored.revokedAt) {
       await this.refreshTokenRepo.update(stored.id, { revokedAt: new Date() });
     }
@@ -172,7 +215,9 @@ export class AuthService {
 
   async resetPassword(token: string, newPassword: string): Promise<void> {
     const tokenHash = sha256(token);
-    const record = await this.passwordResetRepo.findOne({ where: { tokenHash } });
+    const record = await this.passwordResetRepo.findOne({
+      where: { tokenHash },
+    });
     if (!record || record.usedAt || record.expiresAt < new Date()) {
       throw new UnauthorizedException({
         message: 'Invalid or expired reset token',
@@ -182,7 +227,10 @@ export class AuthService {
 
     const user = await this.userRepo.findOne({ where: { id: record.userId } });
     if (!user || user.deletedAt) {
-      throw new NotFoundException({ message: 'User not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'User not found',
+        error: 'not_found',
+      });
     }
 
     const passwordHash = await argon2.hash(newPassword, {
@@ -205,7 +253,9 @@ export class AuthService {
 
   async verifyEmail(token: string): Promise<void> {
     const tokenHash = sha256(token);
-    const record = await this.emailVerificationRepo.findOne({ where: { tokenHash } });
+    const record = await this.emailVerificationRepo.findOne({
+      where: { tokenHash },
+    });
     if (!record || record.usedAt || record.expiresAt < new Date()) {
       throw new BadRequestException({
         message: 'Invalid or expired verification token',
@@ -224,11 +274,17 @@ export class AuthService {
   ): Promise<void> {
     const user = await this.userRepo.findOne({ where: { id: userId } });
     if (!user || user.deletedAt) {
-      throw new NotFoundException({ message: 'User not found', error: 'not_found' });
+      throw new NotFoundException({
+        message: 'User not found',
+        error: 'not_found',
+      });
     }
     const ok = await argon2.verify(user.passwordHash, oldPassword);
     if (!ok) {
-      throw new UnauthorizedException({ message: 'Invalid current password', error: 'invalid_credentials' });
+      throw new UnauthorizedException({
+        message: 'Invalid current password',
+        error: 'invalid_credentials',
+      });
     }
     const passwordHash = await argon2.hash(newPassword, {
       type: argon2.argon2id,
@@ -239,7 +295,9 @@ export class AuthService {
     user.passwordHash = passwordHash;
     await this.userRepo.save(user);
 
-    const currentHash = currentRefreshToken ? sha256(currentRefreshToken) : null;
+    const currentHash = currentRefreshToken
+      ? sha256(currentRefreshToken)
+      : null;
     await this.refreshTokenRepo
       .createQueryBuilder()
       .update(RefreshToken)
@@ -256,15 +314,23 @@ export class AuthService {
     meta?: { userAgent?: string; ip?: string },
   ): Promise<AuthTokens> {
     const jti = randomToken(16);
-    const accessToken = this.tokenService.signAccessToken({ id: user.id, email: user.email });
-    const refreshToken = this.tokenService.signRefreshToken({ id: user.id, email: user.email }, jti);
+    const accessToken = this.tokenService.signAccessToken({
+      id: user.id,
+      email: user.email,
+    });
+    const refreshToken = this.tokenService.signRefreshToken(
+      { id: user.id, email: user.email },
+      jti,
+    );
     const refreshTokenHash = sha256(refreshToken);
 
     await this.refreshTokenRepo.save(
       this.refreshTokenRepo.create({
         userId: user.id,
         tokenHash: refreshTokenHash,
-        expiresAt: new Date(Date.now() + this.tokenService.refreshTtlSeconds * 1000),
+        expiresAt: new Date(
+          Date.now() + this.tokenService.refreshTtlSeconds * 1000,
+        ),
         userAgent: meta?.userAgent ?? null,
         ip: meta?.ip ?? null,
       }),
