@@ -46,8 +46,13 @@ X-Internal-Token: <INTERNAL_TOKEN>
 
 **Callback ของ Caption:**
 ```json
-{ "jobId": "...", "result": { "caption": "…แคปชั่นภาษาไทยฉบับเต็มพร้อม #hashtag…" } }
+{ "jobId": "...", "result": {
+    "caption": "…แคปชั่นภาษาไทยฉบับเต็มพร้อม #hashtag…",
+    "mediaPrompt": "English visual prompt for AI Media (image/short video)" } }
 ```
+> `mediaPrompt` เป็น **ภาษาอังกฤษ** สำหรับส่งต่อให้ AI Media สร้างภาพ/วิดีโอ ให้ตรงกับ
+> แคปชั่น + การตัดสินใจ ⚠️ เป็นฟิลด์ที่เพิ่มเข้ามา ต้องตกลงกับทีม AI Media ว่าจะรับ
+> `mediaPrompt` ทาง request ของ `/generate/image` และ `/generate/short_video` อย่างไร
 
 **Callback กรณีข้อผิดพลาด (ทั้งสองเซอร์วิส):**
 ```json
@@ -81,6 +86,8 @@ X-Internal-Token: <INTERNAL_TOKEN>
 3. **การ deploy** — เซอร์วิส Python นี้จะรันที่ไหน (host เดียวกัน? container? URL อะไร?)
 4. **ตัวกระตุ้นสำหรับทดสอบ** — ช่วยยิง request Decision จริงมาที่เซอร์วิสที่เรารันอยู่
    เพื่อยืนยันว่า callback ครบวงจร (end-to-end จริง)
+5. **ตกลงเรื่อง `mediaPrompt`** — เราสร้าง prompt ภาษาอังกฤษให้แล้วในผลลัพธ์ของ Caption
+   ต้องคุยกับทีม AI Media ว่าจะรับฟิลด์นี้เข้าไปใน request ของ media generation อย่างไร
 
 ---
 

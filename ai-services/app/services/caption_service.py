@@ -16,6 +16,7 @@ client = Groq(api_key=settings.GROQ_API_KEY)
 MODEL = "llama-3.3-70b-versatile"
 
 MAX_CAPTION_CHARS = 2000
+MAX_MEDIA_PROMPT_CHARS = 1000
 
 
 def _build_prompt(req: CaptionRequest) -> str:
@@ -48,31 +49,43 @@ def _build_prompt(req: CaptionRequest) -> str:
 {req.caption_hint or 'ไม่มี'}
 
 ## งานของคุณ
-เขียนแคปชั่นโพสต์ Facebook ภาษาไทย 1 ชิ้น ที่:
-1. ดึงดูดความสนใจตั้งแต่บรรทัดแรก
-2. ใช้โทนการสื่อสารตามที่กำหนด
-3. มี emoji ที่เหมาะสม (ไม่มากเกินไป)
-4. มี call-to-action ชัดเจน
-5. ใส่ hashtag ที่เกี่ยวข้องไว้ท้ายแคปชั่น
-6. ความยาวแนะนำ 100-500 ตัวอักษร (ห้ามเกิน {MAX_CAPTION_CHARS})
+สร้าง 2 สิ่งต่อไปนี้:
+
+### 1) caption (ภาษาไทย)
+แคปชั่นโพสต์ Facebook ภาษาไทย 1 ชิ้น ที่:
+- ดึงดูดความสนใจตั้งแต่บรรทัดแรก
+- ใช้โทนการสื่อสารตามที่กำหนด
+- มี emoji ที่เหมาะสม (ไม่มากเกินไป) และมี call-to-action ชัดเจน
+- ใส่ hashtag ที่เกี่ยวข้องไว้ท้ายแคปชั่น
+- ความยาวแนะนำ 100-500 ตัวอักษร (ห้ามเกิน {MAX_CAPTION_CHARS})
+
+### 2) mediaPrompt (ภาษาอังกฤษเท่านั้น)
+คำสั่งบรรยายภาพ/วิดีโอสั้นสำหรับ AI สร้างสื่อ (image / short video generator).
+ต้องเป็น **ภาษาอังกฤษ** และเป็นการ "บรรยายภาพ" ไม่ใช่การแปลแคปชั่น โดย:
+- บรรยายฉาก: subject, setting, lighting, composition, mood, style
+- สอดคล้องกับสินค้า/บริการที่เน้น ประเภทโพสต์ และโทนแบรนด์
+- เหมาะกับงานถ่ายภาพโฆษณาอาหาร/สินค้า (photorealistic, appetizing ถ้าเกี่ยวกับอาหาร)
+- อย่าใส่ตัวอักษร/ข้อความลงในภาพ (no text, no watermark, no logo)
+- กระชับ ไม่เกิน {MAX_MEDIA_PROMPT_CHARS} ตัวอักษร
 
 ตอบกลับในรูปแบบ JSON นี้เท่านั้น (ห้ามมีข้อความอื่น):
 {{
-  "caption": "เนื้อหาแคปชั่นภาษาไทย รวม emoji และ hashtag ท้ายข้อความ"
+  "caption": "เนื้อหาแคปชั่นภาษาไทย รวม emoji และ hashtag ท้ายข้อความ",
+  "mediaPrompt": "English visual description for image/video generation"
 }}"""
 
 
 def build_caption(req: CaptionRequest) -> CaptionResult:
-    """Core logic: generate a single Thai caption (hashtags embedded)."""
+    """Core logic: generate a Thai caption + an English media prompt in one call."""
     prompt = _build_prompt(req)
     response = client.chat.completions.create(
         model=MODEL,
         messages=[
-            {"role": "system", "content": "คุณเป็นนักเขียนแคปชั่นการตลาดภาษาไทย ตอบกลับด้วย JSON ที่ถูกต้องเท่านั้น"},
+            {"role": "system", "content": "คุณเป็นนักเขียนแคปชั่นการตลาดภาษาไทยและผู้เชี่ยวชาญการเขียน prompt สร้างภาพภาษาอังกฤษ ตอบกลับด้วย JSON ที่ถูกต้องเท่านั้น"},
             {"role": "user", "content": prompt},
         ],
         temperature=0.8,
-        max_tokens=600,
+        max_tokens=800,
     )
 
     raw = response.choices[0].message.content.strip()
@@ -81,7 +94,8 @@ def build_caption(req: CaptionRequest) -> CaptionResult:
     data = json.loads(raw)
 
     caption = data["caption"].strip()[:MAX_CAPTION_CHARS]
-    return CaptionResult(caption=caption)
+    media_prompt = (data.get("mediaPrompt") or "").strip()[:MAX_MEDIA_PROMPT_CHARS] or None
+    return CaptionResult(caption=caption, media_prompt=media_prompt)
 
 
 def process_caption(req: CaptionRequest) -> None:

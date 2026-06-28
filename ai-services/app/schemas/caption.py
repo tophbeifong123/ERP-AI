@@ -35,6 +35,9 @@ class CaptionRequest(CamelModel):
 
 class CaptionResult(CamelModel):
     caption: str
+    # English visual prompt for the AI Media service (image / short video).
+    # Aligned with the caption + decision; NOT a translation of the caption.
+    media_prompt: str | None = None
 
 
 class CaptionCallback(CamelModel):

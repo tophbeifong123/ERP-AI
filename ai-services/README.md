@@ -137,16 +137,24 @@ venv\Scripts\uvicorn app.main:app --reload
 ```json
 {
   "jobId": "7f8e9d0c-...",
-  "result": { "caption": "ศุกร์นี้พบกับโปรสุดคุ้ม! 🍜 ... #กาแฟสด #ดอยช้าง" }
+  "result": {
+    "caption": "ศุกร์นี้พบกับโปรสุดคุ้ม! 🍜 ... #กาแฟสด #ดอยช้าง",
+    "mediaPrompt": "A warm photo of iced latte and Americano on a wooden table, cozy coffee shop, soft natural light, no text"
+  }
 }
 ```
 
-แคปชั่นเป็นข้อความเดียว (ฝัง hashtag ไว้ในตัว) ความยาวไม่เกิน 2000 ตัวอักษร
+`caption` เป็นข้อความเดียว (ฝัง hashtag ไว้ในตัว) ความยาวไม่เกิน 2000 ตัวอักษร
 (แนะนำ 100–500 ตัวอักษร) กรณีเกิดข้อผิดพลาด:
 `{ "jobId": "...", "error": { "code": "model_error", "message": "..." } }`
 
-> **เรื่องสื่อ (Media):** เซอร์วิสนี้ **ไม่ได้** เรียก AI Media เอง ฝั่ง backend จะเป็นผู้
-> จัดการการสร้างรูป/วิดีโอแยกต่างหาก (ดู `docs/contracts/AI-MEDIA.md`)
+> **`mediaPrompt` (ภาษาอังกฤษ):** prompt บรรยายภาพ/วิดีโอสำหรับ AI Media ที่สร้างให้
+> สอดคล้องกับแคปชั่น + การตัดสินใจ (ไม่ใช่การแปลแคปชั่น) เพื่อให้ภาพที่ได้ตรงกับโพสต์
+> ⚠️ ฟิลด์นี้เป็นส่วนขยายของ contract — ต้องตกลงกับทีม backend + AI Media ว่าจะส่ง
+> `mediaPrompt` ต่อไปยัง AI Media อย่างไร (ดู `docs/contracts/AI-MEDIA.md`)
+
+> **เรื่องสื่อ (Media):** เซอร์วิสนี้ **ไม่ได้** เรียก AI Media เอง เราเพียงสร้าง `mediaPrompt`
+> ให้ ส่วน backend จะเป็นผู้ส่งต่อไปยัง AI Media เพื่อสร้างรูป/วิดีโอ
 
 ---
 

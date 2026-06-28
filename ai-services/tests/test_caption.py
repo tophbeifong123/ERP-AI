@@ -70,17 +70,42 @@ def test_strips_code_fences(monkeypatch):
     assert result.caption == "สวัสดี 🍵 #กาแฟ"
 
 
+def test_generates_english_media_prompt(monkeypatch):
+    """The model returns caption + mediaPrompt; both must be parsed."""
+    fake = json.dumps({
+        "caption": "อร่อยมาก! #อาหาร",
+        "mediaPrompt": "A photorealistic bowl of Thai tom yum noodles, fresh shrimp, "
+                       "steam rising, warm restaurant lighting, no text",
+    })
+    monkeypatch.setattr(caption_service.client.chat.completions, "create", _fake_groq(fake))
+
+    result = caption_service.build_caption(_request())
+    assert result.caption == "อร่อยมาก! #อาหาร"
+    assert result.media_prompt.startswith("A photorealistic")
+
+
+def test_media_prompt_optional_when_absent(monkeypatch):
+    """If the model omits mediaPrompt, we still succeed with None."""
+    monkeypatch.setattr(caption_service.client.chat.completions, "create",
+                        _fake_groq(json.dumps({"caption": "hi"})))
+    result = caption_service.build_caption(_request())
+    assert result.media_prompt is None
+
+
 def test_process_caption_posts_camelcase_callback(monkeypatch):
     captured = {}
     monkeypatch.setattr(caption_service, "post_callback",
                         lambda url, payload: captured.update(url=url, payload=payload))
     monkeypatch.setattr(caption_service.client.chat.completions, "create",
-                        _fake_groq(json.dumps({"caption": "โพสต์ทดสอบ #ทดสอบ"})))
+                        _fake_groq(json.dumps({"caption": "โพสต์ทดสอบ #ทดสอบ",
+                                               "mediaPrompt": "A cozy cafe scene, no text"})))
 
     caption_service.process_caption(_request())
 
     assert captured["payload"]["jobId"] == "job-123"
     assert captured["payload"]["result"]["caption"] == "โพสต์ทดสอบ #ทดสอบ"
+    # English media prompt is delivered under the camelCase key
+    assert captured["payload"]["result"]["mediaPrompt"] == "A cozy cafe scene, no text"
 
 
 def test_process_caption_sends_error_callback_on_failure(monkeypatch):
