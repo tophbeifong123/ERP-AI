@@ -22,7 +22,7 @@ import { PostStateMachine as PostStateMachineFromPosts } from '../posts/state-ma
 import { PostEventsService } from '../posts/post-events.service';
 
 export interface DecideDto {
-  businessId: string;
+  planId: string;
   shouldPostToday: boolean;
   reasoning: string;
   suggestedPostType?: string;
@@ -71,8 +71,37 @@ export class AiService {
   ) {}
 
   async decide(dto: DecideDto): Promise<ContentPlan> {
+    const plan = await this.planRepo.findOne({ where: { id: dto.planId } });
+    if (!plan) {
+      throw new NotFoundException({
+        message: 'Content plan not found',
+        error: 'not_found',
+      });
+    }
+    if (plan.status !== 'pending_decide') {
+      this.logger.warn(
+        `Plan ${plan.id} already has decision (status=${plan.status}), overwriting`,
+      );
+    }
+
+    plan.decidedBy = 'ai';
+    plan.shouldPostToday = dto.shouldPostToday;
+    plan.status = 'planned';
+    plan.aiReasoning = dto.reasoning;
+    plan.suggestedPostType = dto.suggestedPostType ?? null;
+    plan.suggestedFeaturedServiceIds = dto.suggestedFeaturedServiceIds ?? [];
+    plan.suggestedCaptionHint = dto.suggestedCaptionHint ?? null;
+    plan.suggestedScheduledAt = dto.suggestedScheduledAt ?? null;
+    plan.targetWindowStart = dto.targetWindowStart ?? null;
+    plan.targetWindowEnd = dto.targetWindowEnd ?? null;
+    plan.payloadJson = { ...(plan.payloadJson ?? {}), ...(dto.payload ?? {}) };
+
+    return this.planRepo.save(plan);
+  }
+
+  async createPendingPlan(businessId: string): Promise<ContentPlan> {
     const business = await this.businessRepo.findOne({
-      where: { id: dto.businessId, deletedAt: IsNull() },
+      where: { id: businessId, deletedAt: IsNull() },
     });
     if (!business) {
       throw new NotFoundException({
@@ -82,18 +111,12 @@ export class AiService {
     }
 
     const plan = this.planRepo.create({
-      businessId: dto.businessId,
+      businessId,
       decidedBy: 'ai',
-      shouldPostToday: dto.shouldPostToday,
-      status: 'planned',
-      aiReasoning: dto.reasoning,
-      suggestedPostType: dto.suggestedPostType ?? null,
-      suggestedFeaturedServiceIds: dto.suggestedFeaturedServiceIds ?? [],
-      suggestedCaptionHint: dto.suggestedCaptionHint ?? null,
-      suggestedScheduledAt: dto.suggestedScheduledAt ?? null,
-      targetWindowStart: dto.targetWindowStart ?? null,
-      targetWindowEnd: dto.targetWindowEnd ?? null,
-      payloadJson: dto.payload ?? {},
+      shouldPostToday: true,
+      status: 'pending_decide',
+      suggestedFeaturedServiceIds: [],
+      payloadJson: {},
     });
     return this.planRepo.save(plan);
   }

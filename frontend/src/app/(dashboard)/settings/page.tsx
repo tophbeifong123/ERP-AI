@@ -185,6 +185,27 @@ function SettingsContent() {
     }
   };
 
+  // --- Facebook Page: Disconnect ---
+  const handleDisconnectFacebook = async (pageId: string) => {
+    if (!activeBusinessId) return;
+    if (!confirm('คุณต้องการยกเลิกการเชื่อมต่อเพจ Facebook นี้ใช่หรือไม่?')) return;
+
+    setLoading(true);
+    try {
+      await businessService.disconnectFacebookPage(activeBusinessId, pageId);
+      await fetchBusinesses();
+      setFbPages([]);
+      setSelectedFbPageId('');
+      setFbStatus('idle');
+      toast.success('ยกเลิกการผูกเพจ Facebook ของคุณเรียบร้อยแล้ว');
+    } catch (err) {
+      const axiosError = err as { response?: { data?: { message?: string } } };
+      toast.error(axiosError.response?.data?.message || 'ไม่สามารถยกเลิกการเชื่อมโยงเพจได้');
+    } finally {
+      setLoading(false);
+    }
+  };
+
   // --- Danger Zone: Delete Business ---
   const handleDeleteBusiness = async () => {
     if (!activeBusinessId || !activeBusiness) return;
@@ -216,6 +237,11 @@ function SettingsContent() {
       setIsDeleting(false);
     }
   };
+
+  // ดึงเพจที่ผูกกับธุรกิจปัจจุบัน (ถ้ามี)
+  const activePage = activeBusiness?.facebookPages && activeBusiness.facebookPages.length > 0
+    ? activeBusiness.facebookPages[0]
+    : null;
 
   return (
     <div className="space-y-6 max-w-4xl mx-auto">
@@ -310,24 +336,61 @@ function SettingsContent() {
         )}
 
         {/* Tab 3: Facebook Connection (Reuse Step4FbConnection) */}
-        {activeTab === 'facebook' && (
+        {activeTab === 'facebook' && activeBusiness && (
           <div className="space-y-4">
             <div className="mb-4">
               <h2 className="text-lg font-bold text-foreground">เชื่อมต่อและผูกสิทธิ์ Facebook Page</h2>
               <p className="text-xs text-muted-foreground">ผูกเพจโซเชียลมีเดียที่จะเป็นปลายทางในการนำส่งโพสต์อัตโนมัติ</p>
             </div>
-            <Step4FbConnection
-              fbStatus={fbStatus}
-              fbPages={fbPages}
-              loadingPages={loadingPages}
-              selectedFbPageId={selectedFbPageId}
-              setSelectedFbPageId={setSelectedFbPageId}
-              onConnectOAuth={handleConnectFacebookOAuth}
-              onFinalize={handleFinalizeFacebook}
-              loading={loading}
-              hideBack={true}
-              finalizeText="บันทึกการผูกเพจ Facebook"
-            />
+            
+            {activePage ? (
+              <div className="p-6 rounded-xl border border-border bg-muted/20 space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-background gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full border border-border bg-muted overflow-hidden shrink-0 flex items-center justify-center">
+                      {activePage.pictureUrl ? (
+                        <img src={activePage.pictureUrl} alt={activePage.pageName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-primary font-bold text-lg">{activePage.pageName[0]}</span>
+                      )}
+                    </div>
+                    <div>
+                      <span className="block text-sm font-bold text-foreground">{activePage.pageName}</span>
+                      <span className="inline-flex items-center gap-1 mt-1 text-xxs text-emerald-500 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 block animate-pulse" />
+                        เชื่อมต่ออยู่กับระบบ AI
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDisconnectFacebook(activePage.id)}
+                    disabled={loading}
+                    className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-xs font-bold text-white shadow-md disabled:opacity-50 transition cursor-pointer flex items-center gap-1.5 shrink-0"
+                  >
+                    {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    ยกเลิกการเชื่อมต่อเพจ
+                  </button>
+                </div>
+                
+                <p className="text-xs text-muted-foreground leading-normal">
+                  * การยกเลิกเชื่อมต่อจะทำให้ AI หยุดส่งโพสต์อัตโนมัติไปยังเพจนี้ชั่วคราว คุณสามารถทำการเชื่อมต่อใหม่ หรือเปลี่ยนสิทธิ์เป็นเพจอื่นได้ทุกเมื่อ
+                </p>
+              </div>
+            ) : (
+              <Step4FbConnection
+                fbStatus={fbStatus}
+                fbPages={fbPages}
+                loadingPages={loadingPages}
+                selectedFbPageId={selectedFbPageId}
+                setSelectedFbPageId={setSelectedFbPageId}
+                onConnectOAuth={handleConnectFacebookOAuth}
+                onFinalize={handleFinalizeFacebook}
+                loading={loading}
+                hideBack={true}
+                finalizeText="บันทึกการผูกเพจ Facebook"
+              />
+            )}
           </div>
         )}
 

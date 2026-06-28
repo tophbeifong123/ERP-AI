@@ -9,7 +9,11 @@ import {
 import { Business } from './business.entity';
 import { Post } from './post.entity';
 
-export type ContentPlanStatus = 'planned' | 'materialized' | 'cancelled';
+export type ContentPlanStatus =
+  | 'pending_decide'
+  | 'planned'
+  | 'materialized'
+  | 'cancelled';
 export type DecidedBy = 'ai' | 'user';
 
 @Entity('content_plans')
