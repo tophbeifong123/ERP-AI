@@ -4,6 +4,10 @@ import { ConfigModule, ConfigService } from '@nestjs/config';
 import { BullModule } from '@nestjs/bullmq';
 import { AiJob } from '../../database/entities/ai-job.entity';
 import { Post } from '../../database/entities/post.entity';
+import { Business } from '../../database/entities/business.entity';
+import { Service } from '../../database/entities/service.entity';
+import { PostFeaturedService } from '../../database/entities/post-featured-service.entity';
+import { File } from '../../database/entities/file.entity';
 import { FacebookPage } from '../../database/entities/facebook-page.entity';
 import { RefreshToken } from '../../database/entities/refresh-token.entity';
 import { CaptionProcessor } from './caption.processor';
@@ -25,7 +29,16 @@ const queueFactory = (config: ConfigService) => ({
   imports: [
     AuthConfigModule,
     CommonModule,
-    TypeOrmModule.forFeature([AiJob, Post, FacebookPage, RefreshToken]),
+    TypeOrmModule.forFeature([
+      AiJob,
+      Post,
+      Business,
+      Service,
+      PostFeaturedService,
+      File,
+      FacebookPage,
+      RefreshToken,
+    ]),
     BullModule.registerQueueAsync(
       { name: 'caption', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
     ),

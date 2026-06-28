@@ -58,6 +58,25 @@ services:
       - "1025:1025"
       - "8025:8025"
 
+  ai-services:
+    build:
+      context: ./ai-services
+      dockerfile: Dockerfile
+    container_name: erp-ai-services
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: ERP-AI Services
+      DEBUG: "True"
+      HOST: 0.0.0.0
+      PORT: 8000
+      BACKEND_BASE_URL: http://host.docker.internal:3000
+      INTERNAL_TOKEN: dev-internal-api-key
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
 volumes:
   postgres_data:
   redis_data:
