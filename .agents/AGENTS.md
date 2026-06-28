@@ -132,13 +132,19 @@ draft → generating → pending_approval → approved → posted
 
 ### Architecture & Directory Structure
 - ใช้ **Next.js App Router** — ทุก page อยู่ใน `src/app/`
-- **Components:** `src/components/` — แบ่งออกเป็น `ui/` (shadcn base components) และส่วนแสดงผลย่อย/เลย์เอาต์อื่นๆ
+- **Components:** `src/components/` — แบ่งออกเป็น:
+  * `ui/` (shadcn base components)
+  * `layouts/` (Sidebar, Navbar, Switcher)
+  * `shared/` (คอมโพเนนต์แชร์ทั่วไป เช่น Countdown, Player)
+  * `features/` (คอมโพเนนต์เฉพาะทางธุรกิจ เช่น table, form ของโพสต์/บริการ)
 - **Core Layer:** `src/core/` — แบ่งออกเป็น:
-  * `services/` (API Clients เช่น `apiClient` และ API caller ต่างๆ)
+  * `services/` (API Clients เช่น `apiClient` และ API service callers)
   * `types/` (TypeScript Interfaces/DTOs)
   * `validations/` (Zod Validation schemas)
 - **Hooks & State Management:** `src/hooks/` — แบ่งออกเป็น `store/` (Zustand client state) และ `queries/` (React Query server state)
+- **Utilities:** `src/lib/` — สำหรับฟังก์ชันเสริมทั่วไป เช่น `utils.ts` (cn helper), datetime formatters, currency converters
 - **Path alias:** `@/*` → `./src/*`
+
 
 ### Component Guidelines
 - ใช้ **shadcn/ui** เป็น base components (14 components ติดตั้งแล้ว)
