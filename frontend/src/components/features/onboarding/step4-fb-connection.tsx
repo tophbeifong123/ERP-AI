@@ -4,6 +4,7 @@
 import React from 'react';
 import { ChevronLeft, Loader2, Check, AlertCircle, RefreshCw } from 'lucide-react';
 import { FacebookPageOption } from '@/core/services/business-service';
+import { toast } from 'sonner';
 
 const FacebookIcon = (props: React.SVGProps<SVGSVGElement>) => (
   <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
@@ -42,134 +43,169 @@ export default function Step4FbConnection({
     <div className="space-y-6 flex-1 flex flex-col justify-between animate-fade-in">
       <div className="space-y-6">
         <div>
-          <h2 className="text-xl font-bold text-foreground mb-1">เชื่อมต่อช่องทางเผยแพร่ Facebook Page</h2>
-          <p className="text-sm text-muted-foreground">อนุญาตสิทธิ์เพื่อให้ AI สามารถดึงข้อมูลและเผยแพร่คอนเทนต์ไปยังเพจของคุณได้ตรงจุด</p>
+          <h2 className="text-xl font-bold text-foreground mb-1">เชื่อมต่อโซเชียลมีเดียปลายทาง</h2>
+          <p className="text-sm text-muted-foreground">อนุญาตสิทธิ์บัญชีปลายทางเพื่อให้ AI สามารถช่วยร่างเนื้อหาและเผยแพร่ได้โดยอัตโนมัติ</p>
         </div>
 
-        {fbStatus === 'error' && (
-          <div className="p-4 rounded-xl border border-destructive/20 bg-destructive/5 flex items-start gap-3 animate-shake">
-            <div className="w-8 h-8 rounded-full bg-destructive/10 flex items-center justify-center text-destructive shrink-0">
-              <AlertCircle className="w-5 h-5" />
-            </div>
-            <div className="flex-1">
-              <span className="block text-xs font-bold text-destructive">เกิดข้อผิดพลาดในการเชื่อมต่อ</span>
-              <span className="block text-xxs text-muted-foreground">การดึงสิทธิ์โทเค็นจาก Facebook ล้มเหลวหรือถูกปฏิเสธ กรุณาลองใหม่อีกครั้ง</span>
-            </div>
-          </div>
-        )}
-
-        {fbStatus !== 'connected' ? (
-          <div className="flex flex-col items-center justify-center p-8 border border-border bg-muted/20 rounded-2xl text-center gap-5 relative overflow-hidden transition-all duration-300 hover:border-primary/30">
-            <div className="w-16 h-16 rounded-full bg-primary/10 flex items-center justify-center text-primary shadow-inner animate-pulse">
-              <FacebookIcon className="w-9 h-9" />
-            </div>
-            <div className="space-y-1">
-              <span className="block text-base font-bold text-foreground">ต้องการผูกสิทธิ์บัญชี Facebook</span>
-              <p className="text-xs text-muted-foreground max-w-sm mx-auto leading-relaxed">
-                ระบบต้องการสิทธิ์จัดการเพจเพื่อวิเคราะห์ วางกำหนดการโพสต์ และร่างเนื้อหาโดยอัตโนมัติ คุณสามารถเข้ามายกเลิกสิทธิ์นี้ได้ทุกเมื่ออย่างปลอดภัย
-              </p>
-            </div>
-            <button
-              type="button"
-              onClick={onConnectOAuth}
-              className="inline-flex items-center justify-center gap-2 px-6 py-3 rounded-xl bg-[#1877F2] hover:bg-[#1877F2]/90 text-sm font-bold text-white shadow-lg shadow-[#1877F2]/20 hover:shadow-[#1877F2]/30 active:scale-95 transition-all duration-200 cursor-pointer"
-            >
-              <FacebookIcon className="w-5 h-5 fill-current" />
-              เชื่อมต่อ Facebook Page
-            </button>
-          </div>
-        ) : (
-          <div className="space-y-4">
-            <div className="p-4 rounded-xl border border-emerald-500/20 bg-emerald-500/5 flex items-center gap-3 animate-fade-in">
-              <div className="w-8 h-8 rounded-full bg-emerald-500/10 flex items-center justify-center text-emerald-500 dark:text-emerald-400 shrink-0">
-                <Check className="w-5 h-5" />
+        <div className="space-y-5">
+          
+          {/* Card 1: Facebook Page Connection (Active OAuth integration) */}
+          <div className="p-5 rounded-xl border border-border bg-muted/15 space-y-4">
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-2.5">
+                <div className="w-8 h-8 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-[#1877F2] font-extrabold text-xs shrink-0">
+                  <FacebookIcon className="w-4 h-4 fill-current" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">Facebook Page</h3>
+                  <p className="text-xxs text-muted-foreground">ระบบส่งข้อมูล Caption และรูปภาพขึ้นหน้าฟีดเพจจริง</p>
+                </div>
               </div>
-              <div className="flex-1">
-                <span className="block text-xs font-bold text-emerald-500 dark:text-emerald-400">เชื่อมต่อสิทธิ์บัญชีสำเร็จ</span>
-                <span className="block text-xxs text-muted-foreground">กรุณาเลือกเพจหลัก 1 เพจจากรายการด้านล่าง เพื่อควบคุมโพสต์อัจฉริยะ</span>
-              </div>
-              <button
-                type="button"
-                onClick={onConnectOAuth}
-                className="text-xs text-primary hover:underline flex items-center gap-1 cursor-pointer shrink-0 font-medium"
-              >
-                <RefreshCw className="w-3 h-3" />
-                สลับบัญชีอื่น
-              </button>
+              
+              {fbStatus === 'connected' && (
+                <span className="inline-flex items-center gap-1 text-xxs text-emerald-500 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full shrink-0">
+                  <span className="w-1 h-1 rounded-full bg-emerald-500 block animate-pulse" />
+                  เชื่อมต่อสำเร็จ
+                </span>
+              )}
             </div>
 
-            {loadingPages ? (
-              <div className="space-y-3 py-4">
-                <div className="flex items-center gap-2 justify-center text-xs text-muted-foreground">
-                  <Loader2 className="w-4 h-4 animate-spin text-primary" />
-                  กำลังดึงข้อมูลเพจของท่านจาก Facebook...
-                </div>
-                {/* Skeleton Page Loaders */}
-                <div className="space-y-2">
-                  {[1, 2].map((i) => (
-                    <div key={i} className="flex items-center justify-between p-3.5 rounded-xl border border-border bg-muted/10 opacity-60">
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-muted animate-pulse" />
-                        <div className="h-4 w-28 bg-muted rounded animate-pulse" />
-                      </div>
-                      <div className="w-5 h-5 rounded-full bg-muted animate-pulse" />
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : fbPages.length === 0 ? (
-              <div className="p-8 text-center border border-dashed border-border rounded-xl bg-muted/5 flex flex-col items-center gap-3">
-                <AlertCircle className="w-8 h-8 text-muted-foreground" />
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-foreground">ไม่พบบัญชี Facebook Page ของคุณ</p>
-                  <p className="text-xs text-muted-foreground max-w-xs leading-normal">
-                    กรุณาตรวจสอบว่าบัญชีที่ใช้เข้าสู่ระบบมีสิทธิ์เป็นผู้ดูแล (Admin) ในเพจ Facebook หรือยืนยันสิทธิ์อีกครั้ง
-                  </p>
-                </div>
-                <button
-                  type="button"
-                  onClick={onConnectOAuth}
-                  className="px-4 py-2 bg-secondary hover:bg-secondary/80 border border-border text-xs font-semibold text-foreground rounded-lg transition cursor-pointer"
-                >
-                  ลองต่อสิทธิ์ใหม่อีกครั้ง
-                </button>
-              </div>
-            ) : (
-              <div className="space-y-2">
-                <label className="text-sm font-semibold text-foreground block">เลือก Facebook Page หลัก <span className="text-red-500">*</span></label>
-                <div className="space-y-2 max-h-[220px] overflow-y-auto pr-1">
-                  {fbPages.map((page) => (
-                    <div
-                      key={page.fbPageId}
-                      onClick={() => setSelectedFbPageId(page.fbPageId)}
-                      className={`flex items-center justify-between p-3.5 rounded-xl border cursor-pointer transition-all duration-200 hover:-translate-y-[1px] hover:shadow-md ${
-                        selectedFbPageId === page.fbPageId
-                          ? 'border-primary bg-primary/10 glow-indigo shadow-sm'
-                          : 'border-border bg-background hover:bg-muted'
-                      }`}
-                    >
-                      <div className="flex items-center gap-3">
-                        <div className="w-9 h-9 rounded-full bg-background border border-border overflow-hidden shrink-0">
-                          {page.pictureUrl ? (
-                            <img src={page.pictureUrl} alt={page.pageName} className="w-full h-full object-cover" />
-                          ) : (
-                            <FacebookIcon className="w-5 h-5 text-muted-foreground m-2" />
-                          )}
-                        </div>
-                        <span className="text-sm font-semibold text-foreground">{page.pageName}</span>
-                      </div>
-                      <div className={`w-5 h-5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
-                        selectedFbPageId === page.fbPageId ? 'border-primary bg-primary text-white' : 'border-border'
-                      }`}>
-                        {selectedFbPageId === page.fbPageId && <Check className="w-3 h-3" />}
-                      </div>
-                    </div>
-                  ))}
+            {fbStatus === 'error' && (
+              <div className="p-3 rounded-lg border border-destructive/20 bg-destructive/5 flex items-start gap-2.5 animate-shake">
+                <AlertCircle className="w-4 h-4 text-destructive shrink-0 mt-0.5" />
+                <div className="flex-1">
+                  <span className="block text-xxs font-bold text-destructive">เกิดข้อผิดพลาดในการเชื่อมโยง Facebook</span>
+                  <span className="block text-xxxs text-muted-foreground">สิทธิ์การเชื่อมต่อหมดอายุหรือไม่ถูกต้อง โปรดลองเชื่อมต่อใหม่อีกครั้ง</span>
                 </div>
               </div>
             )}
+
+            <div className="pt-1">
+              {fbStatus !== 'connected' ? (
+                <div className="flex flex-col items-center justify-center py-6 border border-dashed border-border bg-background/30 rounded-xl text-center gap-4">
+                  <span className="text-xs text-muted-foreground max-w-xs leading-normal">
+                    ระบบต้องการสิทธิ์จัดการเพจเพื่อวิเคราะห์และร่างเนื้อหาโพสต์อัตโนมัติ
+                  </span>
+                  <button
+                    type="button"
+                    onClick={onConnectOAuth}
+                    className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-xl bg-[#1877F2] hover:bg-[#1877F2]/90 text-xs font-bold text-white shadow shadow-[#1877F2]/15 active:scale-95 transition-all duration-200 cursor-pointer"
+                  >
+                    <FacebookIcon className="w-4 h-4 fill-current" />
+                    เชื่อมต่อ Facebook Page
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-3">
+                  <div className="flex items-center justify-between pb-1">
+                    <span className="text-xs font-semibold text-muted-foreground">เลือกเพจหลักที่ต้องการผูกเชื่อมโยง <span className="text-red-500">*</span></span>
+                    <button
+                      type="button"
+                      onClick={onConnectOAuth}
+                      className="text-xxs text-primary hover:underline flex items-center gap-1 cursor-pointer font-bold"
+                    >
+                      <RefreshCw className="w-2.5 h-2.5" />
+                      สลับบัญชีอื่น
+                    </button>
+                  </div>
+
+                  {loadingPages ? (
+                    <div className="flex items-center gap-2 justify-center py-4 text-xxs text-muted-foreground">
+                      <Loader2 className="w-3.5 h-3.5 animate-spin text-primary" />
+                      กำลังค้นหารายการเพจของคุณ...
+                    </div>
+                  ) : fbPages.length === 0 ? (
+                    <div className="p-4 text-center border border-dashed border-border rounded-lg bg-background/30 flex flex-col items-center gap-2">
+                      <p className="text-xs font-semibold text-foreground">ไม่พบบัญชี Facebook Page ของคุณ</p>
+                      <button
+                        type="button"
+                        onClick={onConnectOAuth}
+                        className="px-3 py-1.5 bg-secondary text-xxs font-bold text-foreground rounded-lg border border-border transition cursor-pointer"
+                      >
+                        ลองดึงเพจใหม่อีกครั้ง
+                      </button>
+                    </div>
+                  ) : (
+                    <div className="space-y-2 max-h-[160px] overflow-y-auto pr-1">
+                      {fbPages.map((page) => (
+                        <div
+                          key={page.fbPageId}
+                          onClick={() => setSelectedFbPageId(page.fbPageId)}
+                          className={`flex items-center justify-between p-3 rounded-lg border cursor-pointer transition-all duration-200 ${
+                            selectedFbPageId === page.fbPageId
+                              ? 'border-primary bg-primary/10 glow-indigo shadow-sm'
+                              : 'border-border bg-background hover:bg-muted'
+                          }`}
+                        >
+                          <div className="flex items-center gap-2.5">
+                            <div className="w-8 h-8 rounded-full bg-background border border-border overflow-hidden shrink-0 flex items-center justify-center">
+                              {page.pictureUrl ? (
+                                <img src={page.pictureUrl} alt={page.pageName} className="w-full h-full object-cover" />
+                              ) : (
+                                <FacebookIcon className="w-4 h-4 text-[#1877F2]" />
+                              )}
+                            </div>
+                            <span className="text-xs font-bold text-foreground">{page.pageName}</span>
+                          </div>
+                          <div className={`w-4.5 h-4.5 rounded-full border flex items-center justify-center shrink-0 transition-colors ${
+                            selectedFbPageId === page.fbPageId ? 'border-primary bg-primary text-white' : 'border-border'
+                          }`}>
+                            {selectedFbPageId === page.fbPageId && <Check className="w-2.5 h-2.5" />}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              )}
+            </div>
           </div>
-        )}
+
+          {/* Card 2: Instagram Connection Card */}
+          <div className="p-5 rounded-xl border border-border bg-muted/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 flex items-center justify-center text-white font-extrabold text-xxs shrink-0 mt-0.5 animate-pulse">
+                IG
+              </div>
+              <div className="space-y-0.5">
+                <h3 className="text-sm font-bold text-foreground">Instagram Business</h3>
+                <p className="text-xxs text-muted-foreground leading-relaxed max-w-md">
+                  เชื่อมโยงบัญชี Instagram เพื่อให้ AI นำส่งโพสต์แนะนำสินค้าไปขึ้นฟีด IG ได้พร้อมกับเพจ Facebook ในคลิกเดียว
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => toast.info('เพื่อเชื่อมต่อ Instagram โปรดผูกบัญชี Instagram Business ของคุณเข้ากับ Facebook Page ด้านบนก่อน ระบบจะดึงข้อมูลมาเชื่อมโยงโดยอัตโนมัติ')}
+              className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xxs font-bold shadow transition cursor-pointer shrink-0"
+            >
+              เชื่อมต่อ IG
+            </button>
+          </div>
+
+          {/* Card 3: LINE OA Connection Card */}
+          <div className="p-5 rounded-xl border border-border bg-muted/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative">
+            <div className="flex items-start gap-3">
+              <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 font-extrabold text-xs shrink-0 mt-0.5 animate-pulse">
+                L
+              </div>
+              <div className="space-y-0.5">
+                <h3 className="text-sm font-bold text-foreground">LINE Official Account</h3>
+                <p className="text-xxs text-muted-foreground leading-relaxed max-w-md">
+                  ผูกบัญชี LINE OA เพื่อให้ AI แนะนำตารางการบรอดแคสต์ ส่งโปรโมชั่น หรือจัดทำระบบข้อความตอบกลับหาลูกค้าแบบอัตโนมัติ
+                </p>
+              </div>
+            </div>
+            <button
+              type="button"
+              onClick={() => toast.info('สิทธิ์การเชื่อมต่อ LINE Official Account ของคุณกำลังอยู่ในระหว่างตรวจสอบความถูกต้องความปลอดภัยในขั้นตอนนี้')}
+              className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xxs font-bold shadow transition cursor-pointer shrink-0"
+            >
+              เชื่อมต่อ LINE
+            </button>
+          </div>
+
+        </div>
       </div>
 
       {/* Step navigation */}
@@ -188,9 +224,9 @@ export default function Step4FbConnection({
         
         <button
           type="button"
-          disabled={loading || fbStatus !== 'connected' || fbPages.length === 0}
+          disabled={loading}
           onClick={onFinalize}
-          className="inline-flex items-center justify-center gap-2 px-5 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-sm font-bold text-white shadow-lg disabled:opacity-50 cursor-pointer transition"
+          className="inline-flex items-center justify-center gap-2 px-6 py-2.5 rounded-lg bg-primary hover:bg-primary/90 text-sm font-bold text-white shadow-lg disabled:opacity-50 cursor-pointer transition"
         >
           {loading && <Loader2 className="w-4 h-4 animate-spin" />}
           {finalizeText}
