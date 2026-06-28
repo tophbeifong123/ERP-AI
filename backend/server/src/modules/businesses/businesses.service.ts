@@ -58,7 +58,7 @@ export class BusinessesService {
   async listForOwner(ownerId: string): Promise<Business[]> {
     return this.businessRepo.find({
       where: { ownerId, deletedAt: IsNull() },
-      relations: ['logo', 'facebookPages'],
+      relations: { logo: true, facebookPages: true },
       order: { createdAt: 'DESC' },
     });
   }
@@ -66,7 +66,7 @@ export class BusinessesService {
   async getOne(id: string): Promise<Business> {
     const business = await this.businessRepo.findOne({
       where: { id, deletedAt: IsNull() },
-      relations: ['logo', 'facebookPages'],
+      relations: { logo: true, facebookPages: true },
     });
     if (!business) {
       throw new NotFoundException({
