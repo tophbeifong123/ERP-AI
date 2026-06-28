@@ -1,19 +1,28 @@
 import json
-import httpx
+
 from groq import Groq
+
 from app.core.config import settings
-from app.schemas.caption import CaptionRequest, CaptionResponse
+from app.core.security import post_callback
+from app.schemas.caption import (
+    CaptionRequest,
+    CaptionResult,
+    CaptionCallback,
+    CaptionErrorCallback,
+)
+from app.schemas.decision import ErrorInfo
 
 client = Groq(api_key=settings.GROQ_API_KEY)
 MODEL = "llama-3.3-70b-versatile"
 
+MAX_CAPTION_CHARS = 2000
+
 
 def _build_prompt(req: CaptionRequest) -> str:
-    services_text = ""
     if req.featured_services:
         services_text = "\n".join(
             f"  - {s.name}: {s.description or 'N/A'}"
-            + (f" (ราคา {s.price_minor / 100:.0f} บาท)" if s.price_minor else "")
+            + (f" (ราคา {s.price / 100:.0f} {s.currency or 'บาท'})" if s.price else "")
             for s in req.featured_services
         )
     else:
@@ -25,13 +34,12 @@ def _build_prompt(req: CaptionRequest) -> str:
 ## ข้อมูลธุรกิจ
 - ชื่อร้าน: {req.business.name}
 - ประเภทธุรกิจ: {req.business.industry or 'ทั่วไป'}
-- รายละเอียด: {req.business.description or 'N/A'}
 - โทนการสื่อสาร: {req.business.tone or 'เป็นกันเอง'}
-- กลุ่มเป้าหมาย: {req.business.target_audience or 'ลูกค้าทั่วไป'}
+- กลุ่มเป้าหมาย: {req.target_audience or 'ลูกค้าทั่วไป'}
 - คีย์เวิร์ด: {', '.join(req.business.keywords) if req.business.keywords else 'N/A'}
 
 ## ประเภทโพสต์
-{req.post_type.value if req.post_type else 'brand_awareness'}
+{req.post_type.value}
 
 ## บริการ/สินค้าที่ต้องการเน้น
 {services_text}
@@ -40,50 +48,23 @@ def _build_prompt(req: CaptionRequest) -> str:
 {req.caption_hint or 'ไม่มี'}
 
 ## งานของคุณ
-เขียนแคปชั่นโพสต์ Facebook ภาษาไทยที่:
+เขียนแคปชั่นโพสต์ Facebook ภาษาไทย 1 ชิ้น ที่:
 1. ดึงดูดความสนใจตั้งแต่บรรทัดแรก
 2. ใช้โทนการสื่อสารตามที่กำหนด
 3. มี emoji ที่เหมาะสม (ไม่มากเกินไป)
 4. มี call-to-action ชัดเจน
-5. เหมาะกับกลุ่มเป้าหมาย
+5. ใส่ hashtag ที่เกี่ยวข้องไว้ท้ายแคปชั่น
+6. ความยาวแนะนำ 100-500 ตัวอักษร (ห้ามเกิน {MAX_CAPTION_CHARS})
 
 ตอบกลับในรูปแบบ JSON นี้เท่านั้น (ห้ามมีข้อความอื่น):
 {{
-  "caption": "เนื้อหาแคปชั่นภาษาไทย รวม emoji",
-  "hashtags": ["#แฮชแท็ก1", "#แฮชแท็ก2"],
-  "call_to_action": "ประโยคชวนให้ลูกค้าทำอะไรต่อ"
+  "caption": "เนื้อหาแคปชั่นภาษาไทย รวม emoji และ hashtag ท้ายข้อความ"
 }}"""
 
 
-def _trigger_media(req: CaptionRequest, caption: str) -> tuple[bool, str]:
-    """Fire-and-report call to the AI Media service. Never raises."""
-    try:
-        headers = {}
-        if settings.INTERNAL_TOKEN:
-            headers["Authorization"] = f"Bearer {settings.INTERNAL_TOKEN}"
-
-        payload = {
-            "business_id": req.business.business_id,
-            "caption": caption,
-            "post_type": req.post_type.value if req.post_type else None,
-            "service_ids": [s.id for s in req.featured_services],
-        }
-
-        with httpx.Client(timeout=10.0) as http:
-            resp = http.post(
-                f"{settings.AI_MEDIA_SERVICE_URL}/api/ai/media/generate",
-                json=payload,
-                headers=headers,
-            )
-            resp.raise_for_status()
-        return True, "Media generation triggered"
-    except Exception as e:
-        return False, f"Media service unavailable: {e}"
-
-
-def generate_caption(req: CaptionRequest) -> CaptionResponse:
+def build_caption(req: CaptionRequest) -> CaptionResult:
+    """Core logic: generate a single Thai caption (hashtags embedded)."""
     prompt = _build_prompt(req)
-
     response = client.chat.completions.create(
         model=MODEL,
         messages=[
@@ -97,22 +78,20 @@ def generate_caption(req: CaptionRequest) -> CaptionResponse:
     raw = response.choices[0].message.content.strip()
     if raw.startswith("```"):
         raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-
     data = json.loads(raw)
 
-    caption = data["caption"]
-    hashtags = data.get("hashtags", [])
-    call_to_action = data.get("call_to_action")
+    caption = data["caption"].strip()[:MAX_CAPTION_CHARS]
+    return CaptionResult(caption=caption)
 
-    media_triggered = False
-    media_status = None
-    if req.trigger_media:
-        media_triggered, media_status = _trigger_media(req, caption)
 
-    return CaptionResponse(
-        caption=caption,
-        hashtags=hashtags,
-        call_to_action=call_to_action,
-        media_triggered=media_triggered,
-        media_status=media_status,
-    )
+def process_caption(req: CaptionRequest) -> None:
+    """Background task: generate the caption and POST it to callbackUrl."""
+    try:
+        result = build_caption(req)
+        payload = CaptionCallback(job_id=req.job_id, result=result)
+    except Exception as e:
+        payload = CaptionErrorCallback(
+            job_id=req.job_id,
+            error=ErrorInfo(code="model_error", message=str(e)),
+        )
+    post_callback(req.callback_url, payload.model_dump(by_alias=True, mode="json"))

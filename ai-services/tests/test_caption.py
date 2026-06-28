@@ -1,9 +1,6 @@
-"""Tests for the AI Caption service.
+"""Tests for the AI Caption service (async-callback contract).
 
-Groq is mocked so no real API call is made. We verify:
-  - the JSON response is parsed into caption / hashtags / CTA
-  - the AI Media trigger can be turned off (trigger_media=False)
-  - the AI Media trigger is fault-tolerant (a network error never crashes us)
+Groq and the callback are mocked, so no real API/network calls happen.
 """
 import json
 
@@ -13,7 +10,6 @@ from app.services import caption_service
 
 
 def _fake_groq(fake_json: str):
-    """Return a function that mimics the Groq SDK's create() response shape."""
     def fake_create(*args, **kwargs):
         class _Msg:
             content = fake_json
@@ -31,55 +27,73 @@ def _fake_groq(fake_json: str):
 
 def _request(**overrides) -> CaptionRequest:
     data = dict(
-        business=BusinessContext(business_id="b1", name="ร้านกาแฟ", tone="เป็นกันเอง"),
+        callback_url="https://api.example.com/internal/ai/caption/callback",
+        job_id="job-123",
+        post_id="post-123",
+        business=BusinessContext(id="b1", name="ร้านกาแฟ", tone="เป็นกันเอง"),
         post_type=PostType.PROMOTION,
-        featured_services=[ServiceInfo(id="svc-1", name="ลาเต้", price_minor=6500)],
+        featured_services=[ServiceInfo(id="svc-1", name="ลาเต้", price=6500, currency="THB")],
         caption_hint="ซื้อ 1 แถม 1",
-        trigger_media=False,
+        target_audience="คนรุ่นใหม่",
     )
     data.update(overrides)
     return CaptionRequest(**data)
 
 
-def test_parses_caption_fields(monkeypatch):
-    """A well-formed AI reply maps onto the response fields."""
-    fake = json.dumps({
-        "caption": "วันนี้มีโปรพิเศษ! 🍵",
-        "hashtags": ["#กาแฟ", "#โปรโมชั่น"],
-        "call_to_action": "รีบมาก่อนของหมด!",
+def test_request_accepts_camelcase_input():
+    req = CaptionRequest.model_validate({
+        "callbackUrl": "https://x/cb",
+        "jobId": "j1",
+        "postId": "p1",
+        "business": {"id": "b1", "name": "Shop"},
+        "postType": "promotion",
+        "featuredServices": [{"id": "s1", "name": "Item", "price": 6000, "currency": "THB"}],
+        "targetAudience": "office workers",
     })
-    monkeypatch.setattr(caption_service.client.chat.completions, "create", _fake_groq(fake))
+    assert req.job_id == "j1"
+    assert req.featured_services[0].price == 6000
 
-    resp = caption_service.generate_caption(_request(trigger_media=False))
 
-    assert resp.caption == "วันนี้มีโปรพิเศษ! 🍵"
-    assert resp.hashtags == ["#กาแฟ", "#โปรโมชั่น"]
-    assert resp.call_to_action == "รีบมาก่อนของหมด!"
-    assert resp.media_triggered is False  # we asked not to trigger
+def test_build_caption_parses_and_truncates(monkeypatch):
+    long_caption = "ก" * 2500
+    monkeypatch.setattr(caption_service.client.chat.completions, "create",
+                        _fake_groq(json.dumps({"caption": long_caption})))
+
+    result = caption_service.build_caption(_request())
+    assert len(result.caption) == caption_service.MAX_CAPTION_CHARS  # hard limit enforced
 
 
 def test_strips_code_fences(monkeypatch):
-    """The AI sometimes wraps JSON in ```json fences; we must strip them."""
-    fenced = "```json\n" + json.dumps({"caption": "hi", "hashtags": []}) + "\n```"
+    fenced = "```json\n" + json.dumps({"caption": "สวัสดี 🍵 #กาแฟ"}) + "\n```"
     monkeypatch.setattr(caption_service.client.chat.completions, "create", _fake_groq(fenced))
+    result = caption_service.build_caption(_request())
+    assert result.caption == "สวัสดี 🍵 #กาแฟ"
 
-    resp = caption_service.generate_caption(_request(trigger_media=False))
-    assert resp.caption == "hi"
+
+def test_process_caption_posts_camelcase_callback(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(caption_service, "post_callback",
+                        lambda url, payload: captured.update(url=url, payload=payload))
+    monkeypatch.setattr(caption_service.client.chat.completions, "create",
+                        _fake_groq(json.dumps({"caption": "โพสต์ทดสอบ #ทดสอบ"})))
+
+    caption_service.process_caption(_request())
+
+    assert captured["payload"]["jobId"] == "job-123"
+    assert captured["payload"]["result"]["caption"] == "โพสต์ทดสอบ #ทดสอบ"
 
 
-def test_media_trigger_is_fault_tolerant(monkeypatch):
-    """If the AI Media service errors, caption still succeeds with media_triggered=False."""
-    fake = json.dumps({"caption": "ok", "hashtags": []})
-    monkeypatch.setattr(caption_service.client.chat.completions, "create", _fake_groq(fake))
+def test_process_caption_sends_error_callback_on_failure(monkeypatch):
+    captured = {}
+    monkeypatch.setattr(caption_service, "post_callback",
+                        lambda url, payload: captured.update(payload=payload))
 
-    # Force the media call to blow up; the service must swallow it.
     def boom(*args, **kwargs):
-        raise ConnectionError("media service down")
+        raise RuntimeError("model down")
 
-    monkeypatch.setattr(caption_service.httpx, "Client", boom)
+    monkeypatch.setattr(caption_service.client.chat.completions, "create", boom)
 
-    resp = caption_service.generate_caption(_request(trigger_media=True))
+    caption_service.process_caption(_request())
 
-    assert resp.caption == "ok"           # caption still produced
-    assert resp.media_triggered is False  # but media reported as failed
-    assert "unavailable" in resp.media_status.lower()
+    assert captured["payload"]["jobId"] == "job-123"
+    assert captured["payload"]["error"]["code"] == "model_error"

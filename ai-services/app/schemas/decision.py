@@ -1,6 +1,15 @@
-from pydantic import BaseModel, Field
+"""Schemas for the AI Decision service.
+
+Matches docs/contracts/AI-DECISION.md on the backend `backend` branch.
+Note: `services` is added per the backend dev's decision to send the
+catalogue in the request (Option 1). Confirm exact item fields with them.
+"""
 from datetime import datetime
 from enum import Enum
+
+from pydantic import Field
+
+from app.schemas.common import CamelModel
 
 
 class PostType(str, Enum):
@@ -10,45 +19,70 @@ class PostType(str, Enum):
     EVENT = "event"
 
 
-class ServiceInfo(BaseModel):
+class ServiceInfo(CamelModel):
     id: str
     name: str
     description: str | None = None
-    price_minor: int | None = None
+    price: int | None = None          # satang (6000 = 60.00 THB)
+    currency: str | None = None
+    is_active: bool = True
 
 
-class BusinessContext(BaseModel):
-    business_id: str
+class BusinessContext(CamelModel):
+    id: str
     name: str
     industry: str | None = None
     description: str | None = None
     tone: str | None = None
-    target_audience: str | None = None
     keywords: list[str] = []
-
-
-class PostingConfig(BaseModel):
+    target_audience: str | None = None
     posts_per_week_target: int = Field(ge=1, le=14, default=3)
     min_gap_days: int = Field(ge=0, le=7, default=1)
+    logo_public_url: str | None = None
 
 
-class RecentPostInfo(BaseModel):
-    last_post_date: datetime | None = None
-    posts_this_week: int = 0
+class RecentPost(CamelModel):
+    posted_at: datetime
+    post_type: str
+    # Optional: lets the AI apply the "not featured in last 3 posts" rule.
+    # Pending confirmation that the backend will populate it.
+    featured_service_ids: list[str] = []
 
 
-class DecisionRequest(BaseModel):
+# ---- Incoming request (backend -> AI) ----
+
+class DecisionRequest(CamelModel):
+    callback_url: str
+    plan_id: str
     business: BusinessContext
-    posting_config: PostingConfig
-    recent_posts: RecentPostInfo
+    recent_posts: list[RecentPost] = []
+    posts_this_week: int = 0
+    last_post_at: datetime | None = None
+    now_iso: datetime | None = None
     services: list[ServiceInfo] = []
-    current_time: datetime | None = None
 
 
-class DecisionResponse(BaseModel):
+# ---- Outgoing callback (AI -> backend callbackUrl) ----
+
+class Decision(CamelModel):
     should_post: bool
-    reason: str
+    reasoning: str
     suggested_scheduled_at: datetime | None = None
     post_type: PostType | None = None
     featured_service_ids: list[str] = []
     caption_hint: str | None = None
+
+
+class DecisionCallback(CamelModel):
+    plan_id: str
+    decision: Decision
+
+
+class ErrorInfo(CamelModel):
+    code: str
+    message: str
+
+
+class DecisionErrorCallback(CamelModel):
+    plan_id: str
+    error: ErrorInfo

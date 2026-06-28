@@ -1,11 +1,27 @@
 # ERP-AI Services
 
-AI microservice for the ERP-AI project. Provides two endpoints:
+AI microservice for the ERP-AI project. Two endpoints:
 
-1. **AI Decision** — decides *whether*, *when*, and *what* a business should post on Facebook.
-2. **AI Caption** — generates a Thai-language caption for the post and (optionally) triggers the AI Media service.
+1. **AI Decision** — decides *whether*, *when*, and *what* a business should post.
+2. **AI Caption** — generates a Thai-language caption for the post.
 
-Built with FastAPI + Groq (Llama 3.3 70B). Runs as a standalone service, decoupled from the main backend.
+Built with FastAPI + Groq (Llama 3.3 70B). Aligned to the backend contracts in
+`docs/contracts/AI-DECISION.md` and `AI-CAPTION.md`.
+
+## Architecture: async callback
+
+Both endpoints are **asynchronous**. The backend POSTs a request containing a
+`callbackUrl`; the service replies **`202 Accepted`** immediately, does the work
+in the background, then **POSTs the result back** to `callbackUrl`.
+
+```
+Backend  --POST /decide  (with callbackUrl)-->  AI Service
+Backend  <--202 Accepted--------------------    AI Service
+                                                AI Service --(Groq)--> result
+Backend  <--POST {callbackUrl} (result)-------  AI Service
+```
+
+Auth: every request and callback carries an `X-Internal-Token` header (shared secret).
 
 ---
 
@@ -15,160 +31,126 @@ Built with FastAPI + Groq (Llama 3.3 70B). Runs as a standalone service, decoupl
 cd ai-services
 python -m venv venv
 venv\Scripts\pip install -r requirements.txt
-copy .env.example .env   # then fill in GROQ_API_KEY
+copy .env.example .env   # then fill in GROQ_API_KEY and INTERNAL_TOKEN
 ```
 
-`.env` keys:
+`.env` keys: `GROQ_API_KEY` (required), `INTERNAL_TOKEN` (shared secret).
 
-| Key | Purpose |
-|-----|---------|
-| `GROQ_API_KEY` | Groq API key (required) |
-| `AI_MEDIA_SERVICE_URL` | Base URL of the AI Media service |
-| `INTERNAL_TOKEN` | Shared secret, sent as `Authorization: Bearer` to AI Media |
-
-## Run the server
+## Run
 
 ```powershell
 venv\Scripts\uvicorn app.main:app --reload
 ```
 
-Interactive API docs: <http://localhost:8000/docs>
-Health check: `GET /health` → `{"status": "ok"}`
+Docs: <http://localhost:8000/docs> · Health: `GET /health`
 
 ---
 
 ## Endpoint 1 — AI Decision
 
-`POST /api/ai/decision/decide`
+`POST /api/ai/decision/decide` → `202 Accepted`, then callback to `callbackUrl`.
 
-Decides whether to post today. It first applies cheap rule-based guardrails
-(weekly target reached? minimum gap since last post?) and only calls the AI
-when those pass.
-
-### Request
+### Request (backend → AI)
 
 ```json
 {
+  "callbackUrl": "https://api.example.com/internal/ai/decide/callback",
+  "planId": "9d2e5c4a-...",
   "business": {
-    "business_id": "shop-001",
+    "id": "8a1f3b2c-...",
     "name": "ร้านกาแฟดอยช้าง",
     "industry": "ร้านกาแฟ",
-    "description": "กาแฟสดคั่วเองจากดอยช้าง",
     "tone": "เป็นกันเอง อบอุ่น",
-    "target_audience": "คนรุ่นใหม่ วัยทำงาน",
-    "keywords": ["กาแฟสด", "ดอยช้าง"]
+    "targetAudience": "คนรุ่นใหม่ วัยทำงาน",
+    "keywords": ["กาแฟสด", "ดอยช้าง"],
+    "postsPerWeekTarget": 3,
+    "minGapDays": 1
   },
-  "posting_config": {
-    "posts_per_week_target": 3,
-    "min_gap_days": 1
-  },
-  "recent_posts": {
-    "last_post_date": null,
-    "posts_this_week": 0
-  },
-  "services": [
-    { "id": "svc-1", "name": "ลาเต้เย็น", "description": "กาแฟนมเย็น", "price_minor": 6500 }
+  "recentPosts": [
+    { "postedAt": "2026-06-24T13:00:00Z", "postType": "promotion" }
   ],
-  "current_time": null
+  "postsThisWeek": 1,
+  "lastPostAt": "2026-06-24T13:00:00Z",
+  "nowIso": "2026-06-28T06:00:00Z",
+  "services": [
+    { "id": "svc-1", "name": "ลาเต้เย็น", "price": 6500, "currency": "THB", "isActive": true }
+  ]
 }
 ```
 
-Notes:
-- `price_minor` is in **satang** (6500 = 65.00 บาท).
-- `current_time` may be `null` (server uses now).
+> `services[]` is sent by the backend (Option 1) so the AI can pick `featuredServiceIds`.
+> `price` is in **satang** (6500 = 65.00 THB).
 
-### Response
+### Callback (AI → backend)
 
 ```json
 {
-  "should_post": true,
-  "reason": "Weekly target not reached and enough time has passed",
-  "suggested_scheduled_at": "2026-06-28T19:00:00",
-  "post_type": "product_showcase",
-  "featured_service_ids": ["svc-1"],
-  "caption_hint": "โปรดสัมผัสกาแฟสดคั่วเองจากดอยช้าง"
+  "planId": "9d2e5c4a-...",
+  "decision": {
+    "shouldPost": true,
+    "reasoning": "...",
+    "suggestedScheduledAt": "2026-06-28T11:00:00Z",
+    "postType": "promotion",
+    "featuredServiceIds": ["svc-1"],
+    "captionHint": "..."
+  }
 }
 ```
 
-`post_type` is one of: `promotion`, `product_showcase`, `brand_awareness`, `event`.
-When `should_post` is `false`, the other fields are `null`/empty.
+When `shouldPost` is `false`, only `shouldPost` + `reasoning` are sent. On failure:
+`{ "planId": "...", "error": { "code": "internal_error", "message": "..." } }`.
 
 ---
 
 ## Endpoint 2 — AI Caption
 
-`POST /api/ai/caption/generate`
+`POST /api/ai/caption/generate` → `202 Accepted`, then callback to `callbackUrl`.
 
-Generates a Thai caption. If `trigger_media` is `true`, it also POSTs to the
-AI Media service. The media call is **fault-tolerant** — if AI Media is down,
-the caption still returns and `media_triggered` is `false`.
-
-### Request
+### Request (backend → AI)
 
 ```json
 {
+  "callbackUrl": "https://api.example.com/internal/ai/caption/callback",
+  "jobId": "7f8e9d0c-...",
+  "postId": "6e7d8c9b-...",
   "business": {
-    "business_id": "shop-001",
+    "id": "8a1f3b2c-...",
     "name": "ร้านกาแฟดอยช้าง",
     "tone": "เป็นกันเอง อบอุ่น",
-    "target_audience": "คนรุ่นใหม่ วัยทำงาน",
     "keywords": ["กาแฟสด", "ดอยช้าง"]
   },
-  "post_type": "product_showcase",
-  "featured_services": [
-    { "id": "svc-1", "name": "ลาเต้เย็น", "price_minor": 6500 }
+  "postType": "promotion",
+  "featuredServices": [
+    { "id": "svc-1", "name": "ลาเต้เย็น", "description": "กาแฟนมเย็น", "price": 6500, "currency": "THB" }
   ],
-  "caption_hint": "โปรดสัมผัสกาแฟสดคั่วเองจากดอยช้าง",
-  "trigger_media": true
+  "captionHint": "...",
+  "targetAudience": "คนรุ่นใหม่ วัยทำงาน"
 }
 ```
 
-### Response
+### Callback (AI → backend)
 
 ```json
 {
-  "caption": "วันนี้รู้สึกมันๆ กับลาเต้เย็น 😊 ราคาเพียง 65 บาท ...",
-  "hashtags": ["#กาแฟสด", "#ดอยช้าง", "#คาเฟ่"],
-  "call_to_action": "มาทานกาแฟสดคั่วเองที่ร้านกาแฟดอยช้างกัน!",
-  "media_triggered": true,
-  "media_status": "Media generation triggered"
+  "jobId": "7f8e9d0c-...",
+  "result": { "caption": "ศุกร์นี้พบกับโปรสุดคุ้ม! 🍜 ... #กาแฟสด #ดอยช้าง" }
 }
 ```
 
-When `trigger_media` is true, AI Media receives:
+The caption is a single string (hashtags embedded), ≤2000 chars (100–500 recommended).
+On failure: `{ "jobId": "...", "error": { "code": "model_error", "message": "..." } }`.
 
-```json
-{
-  "business_id": "shop-001",
-  "caption": "<generated caption>",
-  "post_type": "product_showcase",
-  "service_ids": ["svc-1"]
-}
-```
+> **Media:** this service does **not** trigger AI Media. The backend orchestrates
+> image/video generation separately (see `docs/contracts/AI-MEDIA.md`).
 
 ---
 
-## Connecting the two (backend integration)
+## Connecting the two (backend)
 
-The Decision output feeds the Caption input. Note the one mapping the backend
-must do: Decision returns `featured_service_ids` (IDs only), but Caption needs
-`featured_services` (full objects), so look the IDs up in your catalogue:
-
-```python
-featured = [s for s in catalogue if s.id in decision.featured_service_ids]
-
-caption_req = {
-    "business": business,
-    "post_type": decision.post_type,
-    "featured_services": featured,
-    "caption_hint": decision.caption_hint,
-    "trigger_media": True,
-}
-```
-
-A complete runnable example is in [`scripts/demo_pipeline.py`](scripts/demo_pipeline.py).
-
----
+Decision returns `featuredServiceIds` (IDs); Caption needs `featuredServices`
+(full objects). The backend looks the IDs up in its catalogue between the calls.
+See [`scripts/demo_pipeline.py`](scripts/demo_pipeline.py) for a runnable example
+that prints both callback payloads.
 
 ## Tests
 
@@ -176,7 +158,7 @@ A complete runnable example is in [`scripts/demo_pipeline.py`](scripts/demo_pipe
 venv\Scripts\python.exe -m pytest -v
 ```
 
-6 tests covering the decision rules, caption parsing, and media fault-tolerance.
-Groq is mocked, so the suite makes no API calls.
+11 tests covering camelCase parsing, decision rules, caption generation, and
+callback payload shape. Groq is mocked — no API calls.
 
 > On Windows, set `PYTHONIOENCODING=utf-8` before running scripts that print Thai.
