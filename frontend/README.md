@@ -21,36 +21,42 @@
 
 ---
 
-## 📂 โครงสร้างโฟลเดอร์ปัจจุบัน (Phase 1 Directory Structure)
+## 📂 โครงสร้างโฟลเดอร์ระบบ (Directory Structure)
 
-การวางไฟล์ทำตามหลัก **Feature-Based & SoC (Separation of Concerns)** เพื่อรองรับการขยายตัวในเฟสต่อๆ ไป:
+การวางตำแหน่งโฟลเดอร์และไฟล์ ถูกออกแบบตามหลัก **Clean Architecture** และ **SoC (Separation of Concerns)** เพื่อความยืดหยุ่นในการพัฒนาและขยายระบบในระยะยาว:
 
 ```
 src/
-├── app/                                # เส้นทางและการแสดงผลของ Next.js (Pages Layer)
-│   ├── (auth)/                         # กลุ่มหน้าจอการยืนยันตัวตน (Login, Register, etc.)
-│   │   ├── layout.tsx                  # ตกแต่ง UI หน้าจอ Auth ด้วย Glassmorphism & Gradients
+├── app/                                # Routing Layer (Next.js App Router)
+│   ├── (auth)/                         # กลุ่มหน้าจอเข้าสู่ระบบและยืนยันตัวตน (Login, Register, etc.)
+│   │   ├── layout.tsx                  # หน้ากากตกแต่งหน้าระบบ Auth ด้วย Glassmorphic
 │   │   ├── login/
 │   │   ├── register/
 │   │   ├── forgot-password/
 │   │   └── reset-password/
-│   ├── globals.css                     # นำเข้า Tailwind v4 และกำหนด CSS variables
-│   ├── layout.tsx                      # รูทเลย์เอาต์ ติดตั้งระบบ Notification ของ Sonner
-│   └── page.tsx                        # หน้าแรกทำหน้าที่เป็น Routing Gatekeeper คัดกรองผู้ใช้งาน
-├── components/                         # UI Presentation Layer (ส่วนการนำมาใช้ซ้ำ)
-│   └── ui/                             # 14 อะตอมมิกคอมโพเนนต์จาก shadcn/ui (button, input, etc.)
-├── core/                               # ข้อมูลแกนกลางและการติดต่อเซิร์ฟเวอร์ (Domain Layer)
+│   ├── globals.css                     # นำเข้า Tailwind v4 และกำหนดสีสันสไตล์หลักของระบบ
+│   ├── layout.tsx                      # รูทเลย์เอาต์หลัก ติดตั้ง Toaster แจ้งเตือน
+│   └── page.tsx                        # หน้าแรกรับหน้าที่เป็น Routing Gatekeeper คัดแยกเส้นทางอัตโนมัติ
+├── components/                         # UI Presentation Layer (คอมโพเนนต์นำมาใช้ซ้ำ)
+│   ├── ui/                             # คอมโพเนนต์พื้นฐานจาก shadcn/ui (14 ตัวแรก)
+│   ├── layouts/                        # โครงสร้างหลักในการนำทาง (Sidebar, Navbar, Switcher)
+│   ├── shared/                         # คอมโพเนนต์แชร์ทั่วไป (Countdown, Player)
+│   └── features/                       # คอมโพเนนต์เฉพาะทางธุรกิจ (ตารางแสดงผลโพสต์, ฟอร์มบันทึกบริการ)
+├── core/                               # Domain & API Logic Layer
 │   ├── services/
-│   │   ├── api-client.ts               # HTTP client ส่วนกลางพร้อมระบบดักจับต่ออายุโทเค็นอัตโนมัติ
-│   │   └── auth-service.ts             # บริการและคำสั่งเชื่อมต่อ REST API ของกลุ่มสิทธิ์ผู้ใช้งาน
+│   │   ├── api-client.ts               # Core Axios Client พร้อม Interceptors ดักหมุนโทเค็น
+│   │   └── auth-service.ts             # API Call สำหรับการจัดการบัญชีผู้ใช้งาน
 │   ├── types/
-│   │   └── auth.ts                     # ประกาศ TypeScript interface ของผู้ใช้และ API response
+│   │   └── auth.ts                     # ประกาศ Interface และ DTO ของระบบยืนยันตัวตน
 │   └── validations/
-│   │   └── auth-schema.ts              # Zod validation schema สำหรับฟอร์มทั้งหมดในกลุ่มล็อกอิน
-└── hooks/                              # React hooks (State Management Layer)
-    └── store/
-        └── use-auth-store.ts           # จัดเก็บข้อมูล Access Token และโปรไฟล์ด้วย Zustand (In-memory)
+│       └── auth-schema.ts              # Zod schema สำหรับตรวจเช็คฟอร์มล็อกอิน/สมัครสมาชิก
+├── hooks/                              # React Hooks & State Management
+│   ├── store/
+│   │   └── use-auth-store.ts           # จัดเก็บ Access Token ใน Memory ด้วย Zustand
+│   └── queries/                        # (กำลังจะเพิ่มใน Phase 3) React Query สำหรับดักแคชข้อมูลฝั่งเซิร์ฟเวอร์
+└── lib/                                # Library & Helper Utilities (utils.ts, formatters)
 ```
+
 
 ---
 

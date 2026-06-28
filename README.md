@@ -54,16 +54,22 @@ frontend/
 │   │   ├── layout.tsx          # Root Layout (ติดตั้ง Toaster แจ้งเตือน)
 │   │   └── page.tsx            # หน้าดักเส้นทางหลัก (Routing Gatekeeper)
 │   ├── components/             # UI Presentation Components
-│   │   └── ui/                 # อะตอมคอมโพเนนต์จาก shadcn/ui
+│   │   ├── ui/                 # อะตอมคอมโพเนนต์พื้นฐานจาก shadcn/ui
+│   │   ├── layouts/            # โครงสร้างแถบนำทาง (Sidebar, Navbar)
+│   │   ├── shared/             # คอมโพเนนต์ใช้ร่วมกันทั่วไป (Countdown, Player)
+│   │   └── features/           # คอมโพเนนต์เฉพาะทางธุรกิจ (เช่น ตารางโพสต์, ฟอร์มบริการ)
 │   ├── core/                   # Domain & API Layer (Clean Architecture)
-│   │   ├── services/           # apiClient.ts และ APIs เรียกหลังบ้าน
-│   │   ├── types/              # ไฟล์นิยามประเภทข้อมูล TypeScript
-│   │   └── validations/        # ไฟล์ Zod validation schemas สำหรับฟอร์ม
-│   └── hooks/                  # React Hooks & State Management
-│       └── store/              # Zustand stores (use-auth-store.ts)
+│   │   ├── services/           # apiClient.ts และ APIs บริการเรียกหลังบ้าน
+│   │   ├── types/              # ไฟล์นิยามประเภทข้อมูล TypeScript (Interfaces/DTOs)
+│   │   └── validations/        # ไฟล์ Zod validation schemas สำหรับตรวจสอบฟอร์ม
+│   ├── hooks/                  # React Hooks & State Management
+│   │   ├── store/              # Zustand client states (use-auth-store.ts)
+│   │   └── queries/            # React Query server states (คิวรีแคชข้อมูลหลังบ้าน)
+│   ├── lib/                    # Library & Helper Utilities (utils.ts, formatters)
 ├── public/                     # ไฟล์ Static
 └── ...
 ```
+
 
 
 ### ⚙️ การเริ่มต้นใช้งานระบบ (Getting Started)
