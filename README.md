@@ -421,7 +421,7 @@ PostgreSQL entities (TypeORM) — ดู schema ฉบับเต็ม: [`docs
 | `S3_PRESIGN_ENDPOINT` | `http://minio:9000` | Endpoint ที่ใช้ใน presigned URL สำหรับ MinIO (n8n ใช้ upload ผ่าน URL นี้) |
 | `GCP_PROJECT_ID` | — | Google Cloud project ที่ใช้ Vertex AI (ต้องตั้งถ้าเปิด `ENABLE_AI_MEDIA`) |
 | `GCP_VEO_OUTPUT_BUCKET` | — | GCS bucket ที่ Veo 3.1 เขียนวิดีโอลง (ต้องเป็น public read หรือ sign URL) |
-| `APP_URL` | `http://localhost:3000` | URL ที่ n8n ใช้เรียก callback กลับมาที่ backend (ถ้ารันบน WSL ให้ตั้งเป็น IP ของ WSL) |
+| `APP_URL` | `http://localhost:3000` (WSL) หรือ `http://host.docker.internal:3000` (Windows native) | URL ที่ n8n ใช้เรียก callback กลับมาที่ backend — ตั้งให้ตรงกับ host ที่ backend รันอยู่ |
 
 ### Security
 
