@@ -21,6 +21,10 @@ out/
 .env.*.local
 !.env.example
 
+# GCP service account keys — DO NOT COMMIT. A template lives at gcp-key.json.example.
+gcp-key.json
+!gcp-key.json.example
+
 # Logs
 *.log
 npm-debug.log*
