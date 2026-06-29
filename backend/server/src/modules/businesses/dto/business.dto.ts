@@ -1,17 +1,11 @@
 import {
   IsArray,
-  IsBoolean,
   IsIn,
-  IsInt,
   IsOptional,
   IsString,
-  Matches,
-  Max,
   MaxLength,
-  Min,
-  ValidateNested,
 } from 'class-validator';
-import { Type, Transform } from 'class-transformer';
+import { Transform } from 'class-transformer';
 
 export const TONES = [
   'friendly',
@@ -21,44 +15,6 @@ export const TONES = [
   'minimal',
 ] as const;
 export type Tone = (typeof TONES)[number];
-
-export const AUTO_POST_MODES = ['ai_decide', 'fixed_schedule'] as const;
-export type AutoPostMode = (typeof AUTO_POST_MODES)[number];
-
-export class FixedScheduleRuleDto {
-  @IsInt()
-  @Min(0)
-  @Max(6)
-  dayOfWeek: number;
-
-  @IsString()
-  @Matches(/^([01]\d|2[0-3]):[0-5]\d$/, { message: 'time must be HH:mm' })
-  time: string;
-}
-
-export class AutoPostConfigDto {
-  @IsBoolean()
-  enabled: boolean;
-
-  @IsIn(AUTO_POST_MODES as readonly string[])
-  mode: AutoPostMode;
-
-  @IsInt()
-  @Min(1)
-  @Max(14)
-  postsPerWeekTarget: number;
-
-  @IsInt()
-  @Min(0)
-  @Max(7)
-  minGapDays: number;
-
-  @IsOptional()
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => FixedScheduleRuleDto)
-  fixedScheduleRules?: FixedScheduleRuleDto[];
-}
 
 export class CreateBusinessDto {
   @IsString()
@@ -98,11 +54,6 @@ export class CreateBusinessDto {
   @IsArray()
   @IsString({ each: true })
   keywords?: string[];
-
-  @IsOptional()
-  @ValidateNested()
-  @Type(() => AutoPostConfigDto)
-  autoPost?: AutoPostConfigDto;
 }
 
 export class UpdateBusinessDto {
@@ -126,15 +77,4 @@ export class UpdateBusinessDto {
   @IsArray()
   @IsString({ each: true })
   keywords?: string[];
-}
-
-export class UpdateAutoPostDto {
-  @IsBoolean() enabled: boolean;
-  @IsIn(AUTO_POST_MODES as readonly string[]) mode: AutoPostMode;
-  @IsInt() @Min(1) @Max(14) postsPerWeekTarget: number;
-  @IsInt() @Min(0) @Max(7) minGapDays: number;
-  @IsArray()
-  @ValidateNested({ each: true })
-  @Type(() => FixedScheduleRuleDto)
-  fixedScheduleRules: FixedScheduleRuleDto[];
 }

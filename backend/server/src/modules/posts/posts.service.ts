@@ -5,39 +5,53 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import {
   Post,
+  PostMediaType,
   PostStatus,
   RejectionReason,
 } from '../../database/entities/post.entity';
 import { PostMedia } from '../../database/entities/post-media.entity';
 import { PostFeaturedService } from '../../database/entities/post-featured-service.entity';
 import { Business } from '../../database/entities/business.entity';
+import { FacebookPage } from '../../database/entities/facebook-page.entity';
 import { AiJob } from '../../database/entities/ai-job.entity';
 import { PostStateMachine } from './state-machine';
 import { PostEventsService } from './post-events.service';
 
 export interface CreatePostDto {
   businessId: string;
-  fbPageId?: string;
-  caption?: string;
+  hint: string;
   postType?: string;
-  generationSource?: 'auto_ai' | 'fixed_schedule' | 'manual';
+  mediaType?: PostMediaType;
   scheduledAt?: Date;
-  approvalDeadline?: Date;
   mediaIds?: string[];
   featuredServiceIds?: string[];
+}
+
+export interface CreatedJobs {
+  captionJobId: string;
+  mediaJobId: string | null;
+  decisionJobId: string;
 }
 
 export interface UpdatePostDto {
   caption?: string;
   scheduledAt?: Date;
   approvalDeadline?: Date;
+  postType?: string;
   featuredServiceIds?: string[];
 }
+
+const POST_GENERATION_JOB_TYPES: AiJob['type'][] = [
+  'caption',
+  'image',
+  'short_video',
+  'decision',
+];
 
 @Injectable()
 export class PostsService {
@@ -49,13 +63,19 @@ export class PostsService {
     @InjectRepository(PostFeaturedService)
     private featuredRepo: Repository<PostFeaturedService>,
     @InjectRepository(Business) private businessRepo: Repository<Business>,
+    @InjectRepository(FacebookPage)
+    private fbPageRepo: Repository<FacebookPage>,
     @InjectRepository(AiJob) private jobRepo: Repository<AiJob>,
     @InjectQueue('caption') private captionQueue: Queue,
     @InjectQueue('media') private mediaQueue: Queue,
+    @InjectQueue('decision') private decisionQueue: Queue,
     private postEvents: PostEventsService,
   ) {}
 
-  async create(ownerId: string, dto: CreatePostDto): Promise<Post> {
+  async create(
+    ownerId: string,
+    dto: CreatePostDto,
+  ): Promise<{ post: Post; jobs: CreatedJobs }> {
     const business = await this.businessRepo.findOne({
       where: { id: dto.businessId, ownerId, deletedAt: IsNull() },
     });
@@ -66,15 +86,31 @@ export class PostsService {
       });
     }
 
+    // Auto-pick first connected Facebook page if any. We don't require it
+    // here — the user can create a post before connecting FB, and the
+    // dispatch cron will fail with a clear error if no page is connected
+    // at the time of publishing.
+    const fbPage = await this.fbPageRepo.findOne({
+      where: { businessId: business.id, deletedAt: IsNull() },
+      order: { createdAt: 'ASC' },
+    });
+
+    const now = new Date();
+    const approvalDeadline = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+    const mediaType: PostMediaType =
+      dto.mediaType === 'short_video' ? 'short_video' : 'image';
+
     const post = this.postRepo.create({
       businessId: dto.businessId,
-      fbPageId: dto.fbPageId ?? null,
-      caption: dto.caption ?? null,
-      status: 'draft',
-      postType: (dto.postType as Post['postType']) ?? null,
-      generationSource: dto.generationSource ?? 'manual',
-      scheduledAt: dto.scheduledAt ?? null,
-      approvalDeadline: dto.approvalDeadline ?? null,
+      fbPageId: fbPage ? fbPage.id : null,
+      caption: null,
+      status: 'generating',
+      postType: (dto.postType as Post['postType']) ?? 'promotion',
+      mediaType,
+      generationSource: 'manual',
+      scheduledAt: null,
+      approvalDeadline,
+      suggestedScheduledAt: null,
     });
     const saved = await this.postRepo.save(post);
 
@@ -97,25 +133,26 @@ export class PostsService {
       await this.featuredRepo.save(featured);
     }
 
-    if (saved.generationSource === 'auto_ai') {
-      await this.enqueueAiPipeline(saved.id);
-    }
+    const jobs = await this.enqueueFullAIPipeline(saved.id, dto.hint);
 
-    return saved;
+    return { post: saved, jobs };
   }
 
-  async enqueueAiPipeline(postId: string): Promise<{
-    captionJobId: string;
-    imageJobId: string;
-    shortVideoJobId: string;
-  }> {
+  /**
+   * Enqueue the AI jobs for a post. The user picks exactly ONE media
+   * kind (image or short_video) when creating the post; we enqueue
+   * caption + the chosen media + decision. If ENABLE_AI_MEDIA is false
+   * (default), only caption + decision are enqueued (existing behavior).
+   */
+  async enqueueFullAIPipeline(
+    postId: string,
+    hint: string,
+  ): Promise<CreatedJobs> {
     const post = await this.postRepo.findOne({ where: { id: postId } });
     if (!post) {
-      throw new NotFoundException({
-        message: 'Post not found',
-        error: 'not_found',
-      });
+      throw new NotFoundException(`Post ${postId} not found`);
     }
+    const requestedMediaType: PostMediaType = post.mediaType ?? 'image';
 
     const captionJob = await this.jobRepo.save(
       this.jobRepo.create({
@@ -125,58 +162,124 @@ export class PostsService {
         attempts: 0,
         maxAttempts: 3,
         nextRunAt: new Date(),
+        payload: { hint },
       }),
     );
-    const imageJob = await this.jobRepo.save(
+    const decisionJob = await this.jobRepo.save(
       this.jobRepo.create({
         postId,
-        type: 'image',
+        type: 'decision',
         status: 'queued',
         attempts: 0,
         maxAttempts: 3,
         nextRunAt: new Date(),
+        payload: { hint },
       }),
     );
-    const shortVideoJob = await this.jobRepo.save(
-      this.jobRepo.create({
-        postId,
-        type: 'short_video',
-        status: 'queued',
-        attempts: 0,
-        maxAttempts: 3,
-        nextRunAt: new Date(),
-      }),
-    );
+
+    // Media is gated by ENABLE_AI_MEDIA env. When enabled, we enqueue
+    // EXACTLY ONE media job — the kind the user picked for this post
+    // (image or short_video). If the env is false, no media is enqueued
+    // (caption + decision only).
+    const enableMedia =
+      (process.env.ENABLE_AI_MEDIA || 'false').toLowerCase() === 'true';
+
+    let mediaJob: AiJob | null = null;
+    if (enableMedia) {
+      mediaJob = await this.jobRepo.save(
+        this.jobRepo.create({
+          postId,
+          type: requestedMediaType,
+          status: 'queued',
+          attempts: 0,
+          maxAttempts: 3,
+          nextRunAt: new Date(),
+          payload: { hint, mediaType: requestedMediaType },
+        }),
+      );
+    }
 
     await this.captionQueue.add(
       'caption',
       { jobId: captionJob.id },
       { jobId: captionJob.id },
     );
-    await this.mediaQueue.add(
-      'image',
-      { jobId: imageJob.id },
-      { jobId: imageJob.id },
-    );
-    await this.mediaQueue.add(
-      'short_video',
-      { jobId: shortVideoJob.id },
-      { jobId: shortVideoJob.id },
-    );
-
-    if (post.status === 'draft') {
-      post.status = 'generating';
-      await this.postRepo.save(post);
+    if (mediaJob) {
+      await this.mediaQueue.add(
+        mediaJob.type,
+        { jobId: mediaJob.id },
+        { jobId: mediaJob.id },
+      );
     }
+    await this.decisionQueue.add(
+      'decision',
+      { jobId: decisionJob.id },
+      { jobId: decisionJob.id },
+    );
 
     this.logger.log(
-      `Enqueued AI pipeline for post ${postId}: caption=${captionJob.id}`,
+      `Enqueued AI pipeline for post ${postId} (media=${enableMedia ? mediaJob?.type ?? 'none' : 'disabled'})`,
     );
     return {
       captionJobId: captionJob.id,
-      imageJobId: imageJob.id,
-      shortVideoJobId: shortVideoJob.id,
+      mediaJobId: mediaJob?.id ?? null,
+      decisionJobId: decisionJob.id,
     };
+  }
+
+  /**
+   * Called after any AI job callback (caption, image, short_video, decision)
+   * or failure. Checks if all 4 jobs for the post are terminal.
+   * If yes: post → pending_approval (all succeeded) or failed (any failed).
+   */
+  async checkPostGenerationComplete(postId: string): Promise<void> {
+    const jobs = await this.jobRepo.find({
+      where: {
+        postId,
+        type: In(POST_GENERATION_JOB_TYPES),
+      },
+    });
+    if (jobs.length === 0) return;
+    const allTerminal = jobs.every(
+      (j) => j.status === 'succeeded' || j.status === 'failed',
+    );
+    if (!allTerminal) return;
+
+    const post = await this.postRepo.findOne({ where: { id: postId } });
+    if (!post) return;
+    // Accept both 'generating' (normal path) and 'failed' (retry after
+    // an earlier failure) so that a successful retry can revive a post
+    // that was wrongly marked failed.
+    if (post.status !== 'generating' && post.status !== 'failed') return;
+
+    const failedJob = jobs.find((j) => j.status === 'failed');
+    if (failedJob) {
+      const errorMessage =
+        failedJob.lastError ?? 'AI generation failed for one of the jobs';
+      await this.transition(postId, 'failed', {
+        errorCode: 'E_AI_GENERATION_FAILED',
+        errorMessage: `AI ${failedJob.type} job failed: ${errorMessage}`,
+      });
+      return;
+    }
+
+    // All jobs succeeded → revive from failed (if needed) and finalize
+    if (post.status === 'failed') {
+      // Clear stale error fields so the UI no longer shows a red banner
+      await this.postRepo.update(postId, {
+        errorCode: null,
+        errorMessage: null,
+        rejectionReason: null,
+      });
+      this.logger.log(
+        `Reviving post ${postId} from failed → pending_approval (all AI jobs succeeded on retry)`,
+      );
+    }
+    if (!post.scheduledAt && post.suggestedScheduledAt) {
+      post.scheduledAt = post.suggestedScheduledAt;
+      await this.postRepo.save(post);
+    }
+    await this.transition(postId, 'pending_approval');
   }
 
   async list(filter: {
@@ -188,6 +291,8 @@ export class PostsService {
   }): Promise<Post[]> {
     const qb = this.postRepo
       .createQueryBuilder('post')
+      .leftJoinAndSelect('post.media', 'media')
+      .leftJoinAndSelect('media.file', 'file')
       .where('post.deletedAt IS NULL');
     if (filter.businessId)
       qb.andWhere('post.businessId = :bid', { bid: filter.businessId });
@@ -205,7 +310,7 @@ export class PostsService {
   async getOne(id: string): Promise<Post> {
     const post = await this.postRepo.findOne({
       where: { id, deletedAt: IsNull() },
-      relations: { media: true, aiJobs: true },
+      relations: { media: { file: true }, aiJobs: true },
     });
     if (!post) {
       throw new NotFoundException({
@@ -218,7 +323,11 @@ export class PostsService {
 
   async update(id: string, dto: UpdatePostDto): Promise<Post> {
     const post = await this.getOne(id);
-    if (post.status !== 'draft' && post.status !== 'pending_approval') {
+    if (
+      post.status !== 'draft' &&
+      post.status !== 'pending_approval' &&
+      post.status !== 'failed'
+    ) {
       throw new BadRequestException({
         message: `Cannot edit post in status ${post.status}`,
         error: 'invalid_state_for_edit',
@@ -228,6 +337,9 @@ export class PostsService {
     if (dto.scheduledAt !== undefined) post.scheduledAt = dto.scheduledAt;
     if (dto.approvalDeadline !== undefined)
       post.approvalDeadline = dto.approvalDeadline;
+    if (dto.postType !== undefined) {
+      post.postType = dto.postType as Post['postType'];
+    }
     await this.postRepo.save(post);
 
     if (dto.featuredServiceIds) {

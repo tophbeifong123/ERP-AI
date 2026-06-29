@@ -9,9 +9,8 @@ import {
   JoinColumn,
 } from 'typeorm';
 import { Post } from './post.entity';
-import { ContentPlan } from './content-plan.entity';
 
-export type AiJobType = 'caption' | 'image' | 'short_video';
+export type AiJobType = 'caption' | 'image' | 'short_video' | 'decision';
 export type AiJobStatus = 'queued' | 'running' | 'succeeded' | 'failed';
 
 @Entity('ai_jobs')
@@ -23,9 +22,6 @@ export class AiJob {
 
   @Column({ name: 'post_id', type: 'uuid' })
   postId: string;
-
-  @Column({ name: 'plan_id', type: 'uuid', nullable: true })
-  planId: string | null;
 
   @Column({ type: 'text' })
   type: AiJobType;
@@ -41,6 +37,12 @@ export class AiJob {
 
   @Column({ name: 'last_error', type: 'text', nullable: true })
   lastError: string | null;
+
+  @Column({ name: 'error_code', type: 'text', nullable: true })
+  errorCode: string | null;
+
+  @Column({ type: 'jsonb', default: {} })
+  metadata: Record<string, unknown>;
 
   @Column({ type: 'jsonb', default: {} })
   payload: Record<string, unknown>;
@@ -60,8 +62,4 @@ export class AiJob {
   @ManyToOne(() => Post, (post) => post.aiJobs, { onDelete: 'CASCADE' })
   @JoinColumn({ name: 'post_id' })
   post: Post;
-
-  @ManyToOne(() => ContentPlan, { nullable: true })
-  @JoinColumn({ name: 'plan_id' })
-  plan: ContentPlan | null;
 }

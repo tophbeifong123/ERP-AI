@@ -57,4 +57,10 @@
 - ⏳ รอเขียน
 - ❌ ไม่เกี่ยวข้อง
 
-อัปเดตล่าสุด: 2026-06-27
+อัปเดตล่าสุด: 2026-06-29 (มิ.ย. 2026) — sync กับ `posts.mediaType`, structured `ai_jobs.metadata`, n8n flow ใหม่, FB multipart upload
+
+## Security note (มิ.ย. 2026)
+
+- `gcp-key.json` **ไม่ถูก commit ลง repo** — มี `.gitignore` และ template ที่ `gcp-key.json.example`
+- ถ้าเคย leak: ต้อง **revoke** key ใน GCP Console แล้วสร้างใหม่ (ลบ key id ที่ leak แล้ว generate key ใหม่)
+- ดู [docs/PROGRESS.md](./PROGRESS.md) สำหรับรายละเอียด security fix

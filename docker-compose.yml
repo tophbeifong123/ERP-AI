@@ -1,4 +1,35 @@
 services:
+  n8n:
+    image: docker.n8n.io/n8nio/n8n:1.123.59
+    container_name: n8n_local
+    restart: unless-stopped
+    ports:
+      - "${N8N_PORT:-5678}:5678"
+    environment:
+      - GENERIC_TIMEZONE=${GENERIC_TIMEZONE}
+      - TZ=${TZ}
+      - N8N_PORT=5678
+      - N8N_PROTOCOL=${N8N_PROTOCOL}
+      - N8N_HOST=${N8N_HOST}
+      - N8N_EDITOR_BASE_URL=${N8N_EDITOR_BASE_URL}
+      - EXECUTIONS_DATA_PRUNE=${EXECUTIONS_DATA_PRUNE}
+      - EXECUTIONS_DATA_MAX_AGE=${EXECUTIONS_DATA_MAX_AGE}
+      - EXECUTIONS_DATA_PRUNE_TIMEOUT=${EXECUTIONS_DATA_PRUNE_TIMEOUT}
+      - N8N_ENCRYPTION_KEY=${N8N_ENCRYPTION_KEY}
+      - N8N_DEFAULT_BINARY_DATA_MODE=${N8N_DEFAULT_BINARY_DATA_MODE:-filesystem}
+      - N8N_BLOCK_ENV_ACCESS_IN_NODE=false
+      - GCP_PROJECT_ID=${GCP_PROJECT_ID}
+      - GCP_LOCATION=${GCP_LOCATION}
+      - GCP_VEO_OUTPUT_BUCKET=${GCP_VEO_OUTPUT_BUCKET}
+      # Shared with the NestJS backend so the media callback from n8n is accepted
+      - INTERNAL_API_KEY=${INTERNAL_API_KEY:-dev-internal-api-key}
+      - GOOGLE_APPLICATION_CREDENTIALS=/home/node/.n8n/gcp-key.json
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+    volumes:
+      - ./n8n_data:/home/node/.n8n
+      - ./gcp-key.json:/home/node/.n8n/gcp-key.json:ro
+      
   postgres:
     image: postgres:15-alpine
     container_name: erp-ai-postgres
@@ -57,6 +88,25 @@ services:
     ports:
       - "1025:1025"
       - "8025:8025"
+
+  ai-services:
+    build:
+      context: ./ai-services
+      dockerfile: Dockerfile
+    container_name: erp-ai-services
+    restart: unless-stopped
+    ports:
+      - "8000:8000"
+    environment:
+      APP_NAME: ERP-AI Services
+      DEBUG: "True"
+      HOST: 0.0.0.0
+      PORT: 8000
+      BACKEND_BASE_URL: http://host.docker.internal:3000
+      INTERNAL_TOKEN: dev-internal-api-key
+      GROQ_API_KEY: ${GROQ_API_KEY:-}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
 
 volumes:
   postgres_data:

@@ -16,9 +16,10 @@ export type PostType =
   | 'brand_awareness'
   | 'event';
 
-export type GenerationSource = 'auto_ai' | 'fixed_schedule' | 'manual';
+export type GenerationSource = 'manual';
 export type RejectionReason = 'user_rejected' | 'timeout';
 export type PostMediaKind = 'image' | 'short_video';
+export type PostMediaType = 'image' | 'short_video';
 
 export interface PostFile {
   id: string;
@@ -44,8 +45,10 @@ export interface Post {
   caption: string | null;
   status: PostStatus;
   postType: PostType | null;
+  mediaType: PostMediaType;
   generationSource: GenerationSource;
   scheduledAt: string | null;
+  suggestedScheduledAt: string | null;
   approvalDeadline: string | null;
   postedAt: string | null;
   fbPostId: string | null;
@@ -55,4 +58,10 @@ export interface Post {
   createdAt: string;
   updatedAt: string;
   media?: PostMedia[];
+}
+
+export interface CreatedJobs {
+  captionJobId: string;
+  mediaJobId: string | null;
+  decisionJobId: string;
 }

@@ -6,6 +6,7 @@ import { Post } from '../../database/entities/post.entity';
 import { PostMedia } from '../../database/entities/post-media.entity';
 import { PostFeaturedService } from '../../database/entities/post-featured-service.entity';
 import { Business } from '../../database/entities/business.entity';
+import { FacebookPage } from '../../database/entities/facebook-page.entity';
 import { User } from '../../database/entities/user.entity';
 import { AiJob } from '../../database/entities/ai-job.entity';
 import { PostsService } from './posts.service';
@@ -28,6 +29,7 @@ const queueFactory = (config: ConfigService) => ({
       PostMedia,
       PostFeaturedService,
       Business,
+      FacebookPage,
       User,
       AiJob,
     ]),
@@ -39,6 +41,12 @@ const queueFactory = (config: ConfigService) => ({
     }),
     BullModule.registerQueueAsync({
       name: 'media',
+      imports: [ConfigModule],
+      inject: [ConfigService],
+      useFactory: queueFactory,
+    }),
+    BullModule.registerQueueAsync({
+      name: 'decision',
       imports: [ConfigModule],
       inject: [ConfigService],
       useFactory: queueFactory,

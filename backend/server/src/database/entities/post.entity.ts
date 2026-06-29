@@ -30,7 +30,8 @@ export type PostType =
   | 'product_showcase'
   | 'brand_awareness'
   | 'event';
-export type GenerationSource = 'auto_ai' | 'fixed_schedule' | 'manual';
+export type PostMediaType = 'image' | 'short_video';
+export type GenerationSource = 'manual';
 export type RejectionReason = 'user_rejected' | 'timeout';
 
 @Entity('posts')
@@ -57,6 +58,9 @@ export class Post {
   @Column({ name: 'post_type', type: 'text', nullable: true })
   postType: PostType | null;
 
+  @Column({ name: 'media_type', type: 'text', default: 'image' })
+  mediaType: PostMediaType;
+
   @Column({ name: 'generation_source', type: 'text' })
   generationSource: GenerationSource;
 
@@ -65,6 +69,13 @@ export class Post {
 
   @Column({ name: 'approval_deadline', type: 'timestamptz', nullable: true })
   approvalDeadline: Date | null;
+
+  @Column({
+    name: 'suggested_scheduled_at',
+    type: 'timestamptz',
+    nullable: true,
+  })
+  suggestedScheduledAt: Date | null;
 
   @Column({ name: 'posted_at', type: 'timestamptz', nullable: true })
   postedAt: Date | null;

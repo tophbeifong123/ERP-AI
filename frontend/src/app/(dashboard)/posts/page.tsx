@@ -1,44 +1,79 @@
 // src/app/(dashboard)/posts/page.tsx
 'use client';
 
-import React, { useEffect, useState } from 'react';
-import { 
-  Calendar, 
-  Clock, 
-  Check, 
-  X, 
-  Trash2, 
-  Edit3, 
-  Loader2, 
-  Building, 
+import React, { useEffect, useRef, useState } from 'react';
+import {
+  Calendar,
+  Clock,
+  Check,
+  X,
+  Trash2,
+  Edit3,
+  Loader2,
+  Building,
   ExternalLink,
-  Filter,
+  Sparkles,
+  HelpCircle,
+  AlertCircle,
   CheckCircle2,
   XCircle,
-  HelpCircle,
-  AlertCircle
+  Video,
 } from 'lucide-react';
 import { useBusinessStore } from '@/hooks/store/use-business-store';
 import { postService } from '@/core/services/post-service';
-import { Post, PostStatus } from '@/core/types/post';
+import { Post, PostMediaType, PostStatus, PostType } from '@/core/types/post';
+import { Service } from '@/core/types/service';
+import { serviceService } from '@/core/services/service-service';
+import { PostMediaPreview } from '@/components/features/posts/post-media-preview';
 import { toast } from 'sonner';
 
-type FilterStatus = 'all' | 'pending' | 'scheduled' | 'posted' | 'failed_rejected';
+type FilterStatus =
+  | 'all'
+  | 'generating'
+  | 'pending'
+  | 'scheduled'
+  | 'posted'
+  | 'failed_rejected';
+
+const POST_TYPE_LABEL: Record<PostType, string> = {
+  promotion: 'โปรโมชั่น',
+  product_showcase: 'แนะนำสินค้า',
+  brand_awareness: 'สร้างแบรนด์',
+  event: 'กิจกรรม',
+};
+
+const toDatetimeLocal = (iso: string | null): string => {
+  if (!iso) return '';
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return '';
+  const pad = (n: number) => `${n}`.padStart(2, '0');
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+};
+
+const fromDatetimeLocal = (s: string): string | null => {
+  if (!s) return null;
+  const d = new Date(s);
+  if (Number.isNaN(d.getTime())) return null;
+  return d.toISOString();
+};
 
 export default function PostsPage() {
   const { activeBusiness } = useBusinessStore();
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
-  
-  // Filtering & Search
+
   const [activeFilter, setActiveFilter] = useState<FilterStatus>('all');
-  
-  // Edit caption modal state
+
+  // Edit modal state
   const [editModalOpen, setEditModalOpen] = useState(false);
   const [editingPost, setEditingPost] = useState<Post | null>(null);
   const [editCaption, setEditCaption] = useState('');
+  const [editScheduledAt, setEditScheduledAt] = useState('');
+  const [editPostType, setEditPostType] = useState<PostType>('promotion');
+  const [editServiceIds, setEditServiceIds] = useState<string[]>([]);
   const [editLoading, setEditLoading] = useState(false);
+  const [availableServices, setAvailableServices] = useState<Service[]>([]);
 
   const activeBusinessId = activeBusiness?.id;
 
@@ -48,14 +83,16 @@ export default function PostsPage() {
     try {
       const data = await postService.getPosts({ businessId: activeBusinessId });
       setPosts(data);
-    } catch (err) {
+    } catch {
       toast.error('ไม่สามารถโหลดตารางแผนงานโพสต์ได้');
     } finally {
       setLoading(false);
     }
   };
 
+  // Initial load + when business changes
   useEffect(() => {
+    setPosts([]);
     const timer = setTimeout(() => {
       loadPosts();
     }, 0);
@@ -63,27 +100,52 @@ export default function PostsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBusinessId]);
 
+  // 3-second polling while any post is in 'generating'
+  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  useEffect(() => {
+    const hasGenerating = posts.some((p) => p.status === 'generating');
+    if (hasGenerating && !pollRef.current) {
+      pollRef.current = setInterval(() => {
+        loadPosts();
+      }, 3000);
+    }
+    if (!hasGenerating && pollRef.current) {
+      clearInterval(pollRef.current);
+      pollRef.current = null;
+    }
+    return () => {
+      if (pollRef.current) {
+        clearInterval(pollRef.current);
+        pollRef.current = null;
+      }
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [posts]);
+
   const handleApprove = async (id: string) => {
     setActionLoading(id);
     try {
       await postService.approvePost(id);
-      toast.success('อนุมัติเผยแพร่โพสต์สำเร็จ! ระบบจะทำการยิงไปเพจเฟซบุ๊กตามเวลาตารางงาน');
+      toast.success(
+        'อนุมัติโพสต์แล้ว! ระบบจะโพสต์ขึ้น Facebook ตามเวลาที่กำหนด',
+      );
       await loadPosts();
-    } catch (err) {
-      toast.error('ไม่สามารถกดอนุมัติโพสต์ได้');
+    } catch {
+      toast.error('ไม่สามารถอนุมัติโพสต์ได้');
     } finally {
       setActionLoading(null);
     }
   };
 
   const handleReject = async (id: string) => {
-    if (!confirm('คุณแน่ใจว่าต้องการปฏิเสธคำแนะนำโพสต์นี้ของ AI ใช่หรือไม่?')) return;
+    if (!confirm('คุณแน่ใจว่าต้องการปฏิเสธคำแนะนำโพสต์นี้ของ AI ใช่หรือไม่?'))
+      return;
     setActionLoading(id);
     try {
       await postService.rejectPost(id, 'user_rejected');
       toast.success('ปฏิเสธโพสต์เรียบร้อยแล้ว');
       await loadPosts();
-    } catch (err) {
+    } catch {
       toast.error('ไม่สามารถดำเนินการปฏิเสธโพสต์ได้');
     } finally {
       setActionLoading(null);
@@ -91,59 +153,83 @@ export default function PostsPage() {
   };
 
   const handleDelete = async (id: string) => {
-    if (!confirm('คุณต้องการลบโพสต์รายการนี้ออกจากคิวใช่หรือไม่?')) return;
+    if (!confirm('คุณต้องการลบโพสต์รายการนี้ออกจากคิวใช่หรือไม่?'))
+      return;
     setActionLoading(id);
     try {
       await postService.deletePost(id);
       toast.success('ลบโพสต์ออกจากตารางเวลาสำเร็จ');
       setPosts(posts.filter((p) => p.id !== id));
-    } catch (err) {
+    } catch {
       toast.error('ไม่สามารถลบโพสต์ได้');
     } finally {
       setActionLoading(null);
     }
   };
 
-  const handleOpenEditModal = (post: Post) => {
+  const handleOpenEditModal = async (post: Post) => {
     setEditingPost(post);
-    setEditCaption(post.caption || '');
+    setEditCaption(post.caption ?? '');
+    setEditScheduledAt(
+      toDatetimeLocal(post.scheduledAt ?? post.suggestedScheduledAt),
+    );
+    setEditPostType((post.postType ?? 'promotion') as PostType);
+    setEditServiceIds([]); // services not in Post type; pull from full detail
     setEditModalOpen(true);
+    if (activeBusinessId) {
+      try {
+        const data = await serviceService.getServices(activeBusinessId);
+        setAvailableServices(data);
+      } catch {
+        toast.error('ไม่สามารถโหลดรายการสินค้า/บริการได้');
+      }
+    }
   };
 
   const handleSaveEdit = async () => {
     if (!editingPost) return;
     setEditLoading(true);
     try {
-      // ยิงแก้ไข caption ไปหลังบ้าน
-      const response = await postService.deletePost(editingPost.id); // ดึง mockup หรือ delete ชั่วคราว แต่ใน API patch คือ PATCH /posts/:id
-      // เนื่องจากเราสร้างฟังก์ชัน update โพสต์ในหลังบ้าน (@Patch(':id')) เรามาต่อ API PATCH
-      // ยิง API PATCH ตรงผ่าน apiClient
-      const { default: apiClient } = await import('@/core/services/api-client');
-      const res = await apiClient.patch<{ post: Post }>(`/posts/${editingPost.id}`, {
+      const updated = await postService.updatePost(editingPost.id, {
         caption: editCaption,
+        scheduledAt: fromDatetimeLocal(editScheduledAt) ?? undefined,
+        postType: editPostType,
+        featuredServiceIds: editServiceIds,
       });
-      toast.success('ปรับปรุงข้อความโพสต์เรียบร้อยแล้ว');
-      setPosts(posts.map((p) => (p.id === editingPost.id ? res.data.post : p)));
+      toast.success('บันทึกการแก้ไขเรียบร้อยแล้ว');
+      setPosts(posts.map((p) => (p.id === editingPost.id ? updated : p)));
       setEditModalOpen(false);
-    } catch (err) {
-      toast.error('ไม่สามารถแก้ไขข้อความโพสต์ได้');
+    } catch {
+      toast.error('ไม่สามารถแก้ไขโพสต์ได้');
     } finally {
       setEditLoading(false);
     }
   };
 
-  // กรองตามหมวดหมู่แท็บสถานะ
   const filteredPosts = posts.filter((post) => {
     if (activeFilter === 'all') return true;
+    if (activeFilter === 'generating') return post.status === 'generating';
     if (activeFilter === 'pending') return post.status === 'pending_approval';
     if (activeFilter === 'scheduled') return post.status === 'approved';
     if (activeFilter === 'posted') return post.status === 'posted';
-    if (activeFilter === 'failed_rejected') return post.status === 'failed' || post.status === 'rejected' || post.status === 'expired';
+    if (activeFilter === 'failed_rejected')
+      return (
+        post.status === 'failed' ||
+        post.status === 'rejected' ||
+        post.status === 'expired'
+      );
     return true;
   });
 
   const getStatusBadge = (status: PostStatus) => {
     switch (status) {
+      case 'generating':
+        return (
+          <span className="inline-flex items-center gap-1 text-xxs font-bold text-indigo-500 bg-indigo-500/10 px-2 py-0.5 rounded-full">
+            <Loader2 className="w-3 h-3 animate-spin" />
+            AI กำลังสร้าง
+          </span>
+        );
       case 'pending_approval':
         return (
           <span className="inline-flex items-center gap-1 text-xxs font-bold text-amber-500 bg-amber-500/10 px-2 py-0.5 rounded-full">
@@ -197,22 +283,25 @@ export default function PostsPage() {
 
   return (
     <div className="space-y-6">
-      {/* Title Header */}
       <div className="flex items-center gap-3">
         <div className="p-2 rounded-xl bg-primary/10 text-primary border border-primary/20">
           <Calendar className="w-6 h-6 animate-pulse" />
         </div>
         <div>
-          <h1 className="text-2xl font-bold tracking-tight text-foreground">ห้องทำงาน AI โพสต์</h1>
-          <p className="text-sm text-muted-foreground">ปฏิทินแผนงานคอนเทนต์และเครื่องมือจัดการดูแลโพสต์ทั้งหมดของแบรนด์</p>
+          <h1 className="text-2xl font-bold tracking-tight text-foreground">
+            ห้องทำงาน AI โพสต์
+          </h1>
+          <p className="text-sm text-muted-foreground">
+            ปฏิทินแผนงานคอนเทนต์และเครื่องมือจัดการดูแลโพสต์ทั้งหมดของแบรนด์
+          </p>
         </div>
       </div>
 
-      {/* Filter Tabs Menu */}
       <div className="flex border-b border-border gap-1 overflow-x-auto pb-px">
         {(
           [
             { key: 'all', l: 'ทั้งหมด (All)' },
+            { key: 'generating', l: 'AI กำลังสร้าง' },
             { key: 'pending', l: 'รอตรวจอนุมัติ (Review)' },
             { key: 'scheduled', l: 'อนุมัติแล้ว (Scheduled)' },
             { key: 'posted', l: 'เผยแพร่สำเร็จ (Posted)' },
@@ -237,39 +326,57 @@ export default function PostsPage() {
         })}
       </div>
 
-      {/* List Container */}
       {loading ? (
         <div className="flex flex-col items-center justify-center p-20 text-center gap-3">
           <Loader2 className="w-8 h-8 text-primary animate-spin" />
-          <span className="text-xs text-muted-foreground">กำลังโหลดรายการแผนงานโพสต์ของคุณ...</span>
+          <span className="text-xs text-muted-foreground">
+            กำลังโหลดรายการแผนงานโพสต์ของคุณ...
+          </span>
         </div>
       ) : filteredPosts.length === 0 ? (
         <div className="glass-panel rounded-xl p-16 flex flex-col items-center justify-center text-center gap-3 max-w-lg mx-auto">
           <Building className="w-12 h-12 text-muted-foreground animate-pulse" />
-          <span className="text-sm font-bold text-foreground">ไม่พบรายการโพสต์ในหมวดหมู่นี้</span>
+          <span className="text-sm font-bold text-foreground">
+            ไม่พบรายการโพสต์ในหมวดหมู่นี้
+          </span>
           <p className="text-xs text-muted-foreground leading-normal max-w-sm">
-            AI กำลังวิเคราะห์ข้อมูลและวางแผนตารางเวลาทำงานให้แบรนด์ของคุณตามแผนงานการตลาด
+            ไปที่หน้าแดชบอร์ดแล้วกดปุ่ม "สร้างโพสต์ด้วย AI" เพื่อเริ่มงานแรกของคุณ
           </p>
         </div>
       ) : (
         <div className="space-y-4">
           {filteredPosts.map((post) => {
-            const dateText = post.scheduledAt 
-              ? new Date(post.scheduledAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })
-              : 'ไม่ได้กำหนดเวลา';
+            const dateText = post.scheduledAt
+              ? new Date(post.scheduledAt).toLocaleString('th-TH', {
+                  dateStyle: 'short',
+                  timeStyle: 'short',
+                })
+              : post.suggestedScheduledAt
+                ? `แนะนำ: ${new Date(post.suggestedScheduledAt).toLocaleString('th-TH', {
+                    dateStyle: 'short',
+                    timeStyle: 'short',
+                  })}`
+                : 'ยังไม่ได้กำหนดเวลา';
             const hasMedia = post.media && post.media.length > 0;
-            const mediaUrl = hasMedia ? post.media![0].file.publicUrl : null;
+            const firstMedia = hasMedia ? post.media![0] : undefined;
+            const postTypeLabel = post.postType
+              ? POST_TYPE_LABEL[post.postType]
+              : 'ไม่ระบุ';
 
             return (
-              <div 
-                key={post.id} 
+              <div
+                key={post.id}
                 className="glass-panel rounded-xl p-5 flex flex-col md:flex-row md:items-start justify-between gap-5 transition hover:border-white/12"
               >
                 <div className="flex items-start gap-4 flex-1 min-w-0">
-                  {/* Post Media Preview */}
                   <div className="w-20 h-20 rounded-xl border border-border bg-muted shrink-0 overflow-hidden flex items-center justify-center relative">
-                    {mediaUrl ? (
-                      <img src={mediaUrl} alt="Media" className="w-full h-full object-cover" />
+                    {firstMedia ? (
+                      <PostMediaPreview
+                        media={firstMedia}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : post.status === 'generating' ? (
+                      <GeneratingPlaceholder mediaType={post.mediaType} />
                     ) : (
                       <Building className="w-8 h-8 text-muted-foreground" />
                     )}
@@ -278,39 +385,29 @@ export default function PostsPage() {
                   <div className="space-y-2 flex-1 min-w-0">
                     <div className="flex items-center gap-2 flex-wrap">
                       <span className="text-xxs font-extrabold text-primary uppercase bg-primary/10 px-2 py-0.5 rounded">
-                        {post.postType === 'promotion' ? 'โปรโมชั่น' : 
-                         post.postType === 'product_showcase' ? 'แนะนำสินค้า' : 
-                         post.postType === 'brand_awareness' ? 'สร้างแบรนด์' : 'กิจกรรม'}
-                      </span>
-                      <span className="text-xxs text-muted-foreground bg-muted/65 px-1.5 py-0.5 rounded border border-border/40">
-                        {post.generationSource === 'auto_ai' ? '🤖 AI อัจฉริยะ' : 
-                         post.generationSource === 'fixed_schedule' ? '📅 ตารางประจำ' : '✏️ สร้างเอง'}
+                        {postTypeLabel}
                       </span>
                       {getStatusBadge(post.status)}
                     </div>
 
                     <p className="text-xs text-foreground font-medium pr-4 leading-relaxed whitespace-pre-wrap">
-                      {post.caption || 'ไม่มีข้อความประกอบโพสต์'}
+                      {post.caption || (
+                        <span className="text-muted-foreground italic">
+                          AI กำลังสร้างแคปชั่น...
+                        </span>
+                      )}
                     </p>
 
-                    {/* Error Message for failed posts */}
-                    {post.status === 'failed' && post.errorMessage && (
-                      <div className="text-xxs text-red-400 bg-red-500/5 border border-red-500/10 rounded-md p-2 mt-1 leading-normal max-w-lg">
-                        ⚠️ ข้อผิดพลาด: {post.errorMessage}
-                      </div>
-                    )}
-
-                    {/* Approval Deadline for pending posts */}
-                    {post.status === 'pending_approval' && post.approvalDeadline && (
-                      <div className="text-xxs text-amber-500/90 font-medium flex items-center gap-1 mt-1">
-                        <span>⏳ จะหมดอายุอนุมัติ: {new Date(post.approvalDeadline).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })}</span>
-                      </div>
+                    {post.errorMessage && (
+                      <p className="text-xxs text-red-500 bg-red-500/5 border border-red-500/20 rounded px-2 py-1 inline-block">
+                        {post.errorMessage}
+                      </p>
                     )}
 
                     <div className="flex items-center gap-4 text-xxs text-muted-foreground flex-wrap pt-1">
                       <span className="flex items-center gap-1">
                         <Clock className="w-3.5 h-3.5" />
-                        กำหนดเผยแพร่: {dateText}
+                        {dateText}
                       </span>
                       {post.fbPostId && (
                         <a
@@ -326,27 +423,29 @@ export default function PostsPage() {
                   </div>
                 </div>
 
-                {/* Controller Action buttons */}
                 <div className="flex items-center gap-2 md:self-center shrink-0">
                   {post.status === 'pending_approval' && (
                     <>
                       <button
+                        type="button"
                         onClick={() => handleReject(post.id)}
                         disabled={actionLoading !== null}
                         className="p-2 rounded-lg bg-secondary hover:bg-red-500/10 border border-border hover:border-red-500/20 text-muted-foreground hover:text-red-500 transition cursor-pointer disabled:opacity-50"
                         title="ปฏิเสธโพสต์"
                       >
-                        <X className="w-4.5 h-4.5" />
+                        <X className="w-4 h-4" />
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleOpenEditModal(post)}
                         disabled={actionLoading !== null}
                         className="p-2 rounded-lg bg-secondary hover:bg-white/10 border border-border text-muted-foreground hover:text-foreground transition cursor-pointer disabled:opacity-50"
-                        title="แก้ไข Caption"
+                        title="แก้ไข (ยกเว้นรูปภาพ)"
                       >
-                        <Edit3 className="w-4.5 h-4.5" />
+                        <Edit3 className="w-4 h-4" />
                       </button>
                       <button
+                        type="button"
                         onClick={() => handleApprove(post.id)}
                         disabled={actionLoading !== null}
                         className="px-4 py-2 rounded-lg bg-primary hover:bg-primary/95 text-xs font-bold text-white shadow shadow-primary/20 transition cursor-pointer flex items-center gap-1.5 disabled:opacity-50"
@@ -361,9 +460,9 @@ export default function PostsPage() {
                     </>
                   )}
 
-                  {/* ลบโพสต์ออกจากคิวสำหรับโพสต์ที่ล้มเหลว หรือแบบร่าง */}
-                  {(post.status === 'failed' || post.status === 'rejected' || post.status === 'expired' || post.status === 'draft') && (
+                  {post.status === 'failed' && (
                     <button
+                      type="button"
                       onClick={() => handleDelete(post.id)}
                       disabled={actionLoading !== null}
                       className="p-2 rounded-lg bg-secondary hover:bg-red-500/10 border border-border hover:border-red-500/20 text-muted-foreground hover:text-red-500 transition cursor-pointer disabled:opacity-50 flex items-center gap-1 text-xs font-semibold"
@@ -379,59 +478,160 @@ export default function PostsPage() {
         </div>
       )}
 
-      {/* Edit Caption Dialog Modal */}
+      {/* Edit Modal — allows editing caption / scheduledAt / postType / services (NOT image) */}
       {editModalOpen && editingPost && (
-        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4">
-          <div className="max-w-xl w-full glass-panel glow-indigo rounded-2xl p-6 shadow-2xl animate-scale-up space-y-4">
+        <div
+          className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+          onClick={(e) => {
+            if (e.target === e.currentTarget && !editLoading) {
+              setEditModalOpen(false);
+            }
+          }}
+        >
+          <div className="max-w-xl w-full glass-panel glow-indigo rounded-2xl p-6 shadow-2xl animate-scale-up space-y-4 max-h-[92vh] overflow-y-auto">
             <div className="flex justify-between items-start">
               <div>
-                <h3 className="text-lg font-bold text-foreground">แก้ไขข้อความโพสต์ของ AI</h3>
-                <p className="text-xs text-muted-foreground">ปรับคำอธิบายคำโฆษณาเพื่อให้เหมาะกับแบรนด์ของคุณที่สุด</p>
+                <h3 className="text-lg font-bold text-foreground">
+                  แก้ไขโพสต์
+                </h3>
+                <p className="text-xs text-muted-foreground">
+                  คุณสามารถแก้ไขข้อความ เวลาโพสต์ ประเภท และสินค้าที่แนะนำ (รูปภาพถูกล็อก)
+                </p>
               </div>
-              <button 
-                type="button" 
-                onClick={() => setEditModalOpen(false)} 
-                className="text-muted-foreground hover:text-foreground p-1 cursor-pointer"
+              <button
+                type="button"
+                onClick={() => setEditModalOpen(false)}
+                disabled={editLoading}
+                className="text-muted-foreground hover:text-foreground p-1 cursor-pointer disabled:opacity-50"
+                aria-label="Close"
               >
                 <X className="w-5 h-5" />
               </button>
             </div>
 
+            {editingPost.media && editingPost.media.length > 0 && (
+              <div className="rounded-lg border border-border bg-muted/30 p-3 flex items-center gap-3">
+                <PostMediaPreview
+                  media={editingPost.media[0]}
+                  className="w-16 h-16 rounded-lg object-cover"
+                />
+                <div className="text-xs text-muted-foreground">
+                  <p className="font-semibold text-foreground">
+                    {editingPost.media[0].kind === 'short_video'
+                      ? 'วิดีโอถูกสร้างโดย AI'
+                      : 'รูปภาพถูกสร้างโดย AI'}
+                  </p>
+                  <p>ไม่สามารถเปลี่ยนสื่อได้ในเวอร์ชันนี้</p>
+                </div>
+              </div>
+            )}
+
             <div className="space-y-4">
               <div className="space-y-1">
-                <label className="text-xs font-semibold text-foreground">ข้อความแคปชั่นโฆษณา</label>
+                <label className="text-xs font-semibold text-foreground">
+                  ข้อความแคปชั่น
+                </label>
                 <textarea
-                  rows={8}
+                  rows={5}
                   value={editCaption}
                   onChange={(e) => setEditCaption(e.target.value)}
-                  placeholder="ป้อนคำโฆษณาตรงนี้..."
+                  disabled={editLoading}
+                  placeholder="ข้อความโพสต์..."
                   className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none leading-relaxed"
                 />
               </div>
 
-              {/* Action buttons */}
-              <div className="pt-2 flex justify-end gap-2">
-                <button
-                  type="button"
-                  onClick={() => setEditModalOpen(false)}
-                  className="px-4 py-1.5 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-muted transition cursor-pointer"
-                >
-                  ยกเลิก
-                </button>
-                <button
-                  type="button"
-                  onClick={handleSaveEdit}
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-foreground">
+                  เวลาที่จะโพสต์
+                </label>
+                <input
+                  type="datetime-local"
+                  value={editScheduledAt}
+                  onChange={(e) => setEditScheduledAt(e.target.value)}
                   disabled={editLoading}
-                  className="inline-flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-xs font-bold text-white shadow-lg disabled:opacity-50 transition cursor-pointer"
-                >
-                  {editLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
-                  บันทึกการแก้ไข
-                </button>
+                  className="w-full px-3 py-2 rounded-lg border border-border bg-background text-xs text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary"
+                />
+                {editingPost.suggestedScheduledAt && (
+                  <p className="text-xxs text-muted-foreground">
+                    AI แนะนำ:{' '}
+                    {new Date(editingPost.suggestedScheduledAt).toLocaleString(
+                      'th-TH',
+                      { dateStyle: 'short', timeStyle: 'short' },
+                    )}
+                  </p>
+                )}
               </div>
+
+              <div className="space-y-1">
+                <label className="text-xs font-semibold text-foreground">
+                  ประเภทโพสต์
+                </label>
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {(
+                    [
+                      'promotion',
+                      'product_showcase',
+                      'brand_awareness',
+                      'event',
+                    ] as PostType[]
+                  ).map((t) => (
+                    <button
+                      key={t}
+                      type="button"
+                      disabled={editLoading}
+                      onClick={() => setEditPostType(t)}
+                      className={`p-2 rounded-lg border text-xs font-semibold transition cursor-pointer disabled:opacity-50 ${
+                        editPostType === t
+                          ? 'border-primary bg-primary/10 text-primary'
+                          : 'border-border bg-muted/20 text-muted-foreground hover:bg-muted/40'
+                      }`}
+                    >
+                      {POST_TYPE_LABEL[t]}
+                    </button>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            <div className="pt-2 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setEditModalOpen(false)}
+                disabled={editLoading}
+                className="px-4 py-1.5 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-muted transition cursor-pointer disabled:opacity-50"
+              >
+                ยกเลิก
+              </button>
+              <button
+                type="button"
+                onClick={handleSaveEdit}
+                disabled={editLoading}
+                className="inline-flex items-center justify-center gap-1.5 px-4 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-xs font-bold text-white shadow-lg disabled:opacity-50 transition cursor-pointer"
+              >
+                {editLoading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                บันทึกการแก้ไข
+              </button>
             </div>
           </div>
         </div>
       )}
+    </div>
+  );
+}
+
+function GeneratingPlaceholder({ mediaType }: { mediaType?: PostMediaType }) {
+  const isVideo = mediaType === 'short_video';
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-center gap-1 bg-gradient-to-br from-indigo-50 to-purple-50">
+      {isVideo ? (
+        <Video className="w-6 h-6 text-indigo-400 animate-pulse" />
+      ) : (
+        <Sparkles className="w-6 h-6 text-indigo-400 animate-pulse" />
+      )}
+      <span className="text-[10px] text-indigo-600 font-medium">
+        {isVideo ? 'กำลังสร้างวิดีโอ…' : 'กำลังสร้างรูปภาพ…'}
+      </span>
     </div>
   );
 }

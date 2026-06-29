@@ -5,22 +5,19 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Briefcase,
-  Clock,
   Trash2,
   AlertTriangle,
   Loader2,
-  Settings,
-  Globe
+  Settings
 } from 'lucide-react';
 import { toast } from 'sonner';
 
 import { useBusinessStore } from '@/hooks/store/use-business-store';
 import { businessService, FacebookPageOption } from '@/core/services/business-service';
-import { CreateBusinessInput, AutoPostConfigInput } from '@/core/validations/business-schema';
+import { CreateBusinessInput } from '@/core/validations/business-schema';
 
 // นำเข้า Onboarding Reusable Components
 import Step1BusinessForm from '@/components/features/onboarding/step1-business-form';
-import Step2PostSettings from '@/components/features/onboarding/step2-post-settings';
 import Step4FbConnection from '@/components/features/onboarding/step4-fb-connection';
 
 function SettingsContent() {
@@ -33,7 +30,7 @@ function SettingsContent() {
     setActiveBusinessId
   } = useBusinessStore();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'autopost' | 'facebook' | 'danger'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'facebook' | 'danger'>('profile');
   const [loading, setLoading] = useState(false);
 
   // สำหรับการลบธุรกิจ (Danger Zone)
@@ -126,22 +123,6 @@ function SettingsContent() {
     } catch (err) {
       const axiosError = err as { response?: { data?: { message?: string } } };
       toast.error(axiosError.response?.data?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- Submit 2: Update AutoPost Config ---
-  const handleUpdateAutoPost = async (data: AutoPostConfigInput) => {
-    if (!activeBusinessId) return;
-    setLoading(true);
-    try {
-      await businessService.updateAutoPostConfig(activeBusinessId, data);
-      await fetchBusinesses();
-      toast.success('อัปเดตการตั้งค่าการโพสต์อัตโนมัติสำเร็จแล้ว');
-    } catch (err) {
-      const axiosError = err as { response?: { data?: { message?: string } } };
-      toast.error(axiosError.response?.data?.message || 'ไม่สามารถบันทึกตารางการตั้งค่าได้');
     } finally {
       setLoading(false);
     }
@@ -262,8 +243,7 @@ function SettingsContent() {
         {(
           [
             { key: 'profile', l: 'ข้อมูลทั่วไปธุรกิจ', icon: Briefcase },
-            { key: 'autopost', l: 'ระบบโพสต์อัตโนมัติ', icon: Clock },
-            { key: 'connections', l: 'เชื่อมต่อโซเชียลมีเดีย', icon: Globe },
+            { key: 'facebook', l: 'เชื่อมต่อ Facebook Page', icon: Settings },
             { key: 'danger', l: 'Danger Zone (ลบธุรกิจ)', icon: Trash2 },
           ] as const
         ).map((tab) => {
@@ -314,147 +294,62 @@ function SettingsContent() {
           </div>
         )}
 
-        {/* Tab 2: AutoPost Settings (Reuse Step2PostSettings) */}
-        {activeTab === 'autopost' && activeBusiness && (
+        {/* Tab 3: Facebook Connection (Reuse Step4FbConnection) */}
+        {activeTab === 'facebook' && activeBusiness && (
           <div className="space-y-4">
             <div className="mb-4">
-              <h2 className="text-lg font-bold text-foreground">กำหนดพฤติกรรมการตัดสินใจของ AI</h2>
-              <p className="text-xs text-muted-foreground">สลับความถี่และตั้งตารางเวลาทำงานสำหรับการส่งโพสต์อัตโนมัติ</p>
+              <h2 className="text-lg font-bold text-foreground">เชื่อมต่อและผูกสิทธิ์ Facebook Page</h2>
+              <p className="text-xs text-muted-foreground">ผูกเพจโซเชียลมีเดียที่จะเป็นปลายทางในการนำส่งโพสต์อัตโนมัติ</p>
             </div>
-            <Step2PostSettings
-              onSubmit={handleUpdateAutoPost}
-              loading={loading}
-              hideBack={true}
-              defaultValues={{
-                enabled: activeBusiness.autoPostEnabled,
-                mode: activeBusiness.autoPostMode || 'ai_decide',
-                postsPerWeekTarget: activeBusiness.postsPerWeekTarget,
-                minGapDays: activeBusiness.minGapDays,
-                fixedScheduleRules: activeBusiness.fixedScheduleRules || [],
-              }}
-            />
-          </div>
-        )}
-
-        {/* Tab 3: Unified Social Connections */}
-        {activeTab === 'connections' && activeBusiness && (
-          <div className="space-y-6">
-            <div className="mb-4">
-              <h2 className="text-lg font-bold text-foreground">จัดการช่องทางเชื่อมต่อโซเชียลมีเดีย</h2>
-              <p className="text-xs text-muted-foreground">เชื่อมต่อและผูกสิทธิ์บัญชีโซเชียลมีเดียต่างๆ เพื่อนำส่งคอนเทนต์จาก AI โดยอัตโนมัติ</p>
-            </div>
-
-            <div className="grid grid-cols-1 gap-5">
-              
-              {/* Card 1: Facebook Page Connection */}
-              <div className="p-5 rounded-xl border border-border bg-muted/15 space-y-4">
-                <div className="flex items-center gap-2.5">
-                  <div className="w-8 h-8 rounded-full bg-blue-500/10 border border-blue-500/20 flex items-center justify-center text-blue-600 dark:text-blue-400 font-extrabold text-xs shrink-0">
-                    FB
-                  </div>
-                  <div>
-                    <h3 className="text-sm font-bold text-foreground">Facebook Page</h3>
-                    <p className="text-xxs text-muted-foreground">ระบบส่งข้อมูล Caption และรูปภาพขึ้นหน้าฟีดเพจจริง</p>
-                  </div>
-                </div>
-
-                <div className="pt-1">
-                  {activePage ? (
-                    <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between p-3.5 rounded-lg border border-border bg-background gap-4">
-                      <div className="flex items-center gap-3">
-                        <div className="w-10 h-10 rounded-full border border-border bg-muted overflow-hidden shrink-0 flex items-center justify-center">
-                          {activePage.pictureUrl ? (
-                            <img src={activePage.pictureUrl} alt={activePage.pageName} className="w-full h-full object-cover" />
-                          ) : (
-                            <span className="text-primary font-bold text-md">{activePage.pageName[0]}</span>
-                          )}
-                        </div>
-                        <div>
-                          <span className="block text-xs font-bold text-foreground">{activePage.pageName}</span>
-                          <span className="inline-flex items-center gap-1 mt-0.5 text-xxs text-emerald-500 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
-                            <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 block animate-pulse" />
-                            เชื่อมต่ออยู่
-                          </span>
-                        </div>
-                      </div>
-                      <button
-                        type="button"
-                        onClick={() => handleDisconnectFacebook(activePage.id)}
-                        disabled={loading}
-                        className="px-3 py-1.5 rounded-lg bg-red-600 hover:bg-red-700 text-xxs font-bold text-white shadow transition cursor-pointer flex items-center gap-1 shrink-0"
-                      >
-                        {loading && <Loader2 className="w-3 h-3 animate-spin" />}
-                        ยกเลิกเชื่อมต่อ
-                      </button>
+            
+            {activePage ? (
+              <div className="p-6 rounded-xl border border-border bg-muted/20 space-y-4">
+                <div className="flex items-center justify-between p-4 rounded-xl border border-border bg-background gap-4">
+                  <div className="flex items-center gap-3">
+                    <div className="w-12 h-12 rounded-full border border-border bg-muted overflow-hidden shrink-0 flex items-center justify-center">
+                      {activePage.pictureUrl ? (
+                        <img src={activePage.pictureUrl} alt={activePage.pageName} className="w-full h-full object-cover" />
+                      ) : (
+                        <span className="text-primary font-bold text-lg">{activePage.pageName[0]}</span>
+                      )}
                     </div>
-                  ) : (
-                    <div className="p-4 rounded-lg border border-dashed border-border bg-background/50">
-                      <Step4FbConnection
-                        fbStatus={fbStatus}
-                        fbPages={fbPages}
-                        loadingPages={loadingPages}
-                        selectedFbPageId={selectedFbPageId}
-                        setSelectedFbPageId={setSelectedFbPageId}
-                        onConnectOAuth={handleConnectFacebookOAuth}
-                        onFinalize={handleFinalizeFacebook}
-                        loading={loading}
-                        hideBack={true}
-                        finalizeText="บันทึกการผูกเพจ Facebook"
-                      />
+                    <div>
+                      <span className="block text-sm font-bold text-foreground">{activePage.pageName}</span>
+                      <span className="inline-flex items-center gap-1 mt-1 text-xxs text-emerald-500 font-bold bg-emerald-500/10 px-2 py-0.5 rounded-full">
+                        <span className="w-1.5 h-1.5 rounded-full bg-emerald-500 block animate-pulse" />
+                        เชื่อมต่ออยู่กับระบบ AI
+                      </span>
                     </div>
-                  )}
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => handleDisconnectFacebook(activePage.id)}
+                    disabled={loading}
+                    className="px-4 py-2 rounded-lg bg-red-600 hover:bg-red-700 text-xs font-bold text-white shadow-md disabled:opacity-50 transition cursor-pointer flex items-center gap-1.5 shrink-0"
+                  >
+                    {loading && <Loader2 className="w-3.5 h-3.5 animate-spin" />}
+                    ยกเลิกการเชื่อมต่อเพจ
+                  </button>
                 </div>
+                
+                <p className="text-xs text-muted-foreground leading-normal">
+                  * การยกเลิกเชื่อมต่อจะทำให้ AI หยุดส่งโพสต์อัตโนมัติไปยังเพจนี้ชั่วคราว คุณสามารถทำการเชื่อมต่อใหม่ หรือเปลี่ยนสิทธิ์เป็นเพจอื่นได้ทุกเมื่อ
+                </p>
               </div>
-
-              {/* Card 2: Instagram Business Connection (Mock) */}
-              <div className="p-5 rounded-xl border border-border bg-muted/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-gradient-to-tr from-amber-500 via-pink-500 to-purple-600 flex items-center justify-center text-white font-extrabold text-xxs shrink-0 mt-0.5 animate-pulse">
-                    IG
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-foreground">Instagram Business</h3>
-                    </div>
-                    <p className="text-xxs text-muted-foreground leading-relaxed max-w-xl">
-                      เชื่อมโยงบัญชี Instagram เพื่อให้ AI นำส่งโพสต์แนะนำสินค้าแบรนด์คุณไปขึ้นฟีด IG ได้พร้อมกับเพจ Facebook ในคลิกเดียว
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => toast.info('เพื่อเชื่อมต่อ Instagram โปรดผูกบัญชี Instagram Business ของคุณเข้ากับ Facebook Page ด้านบนก่อน ระบบจะดึงมาทำแผนงานโพสต์อัตโนมัติ')}
-                  className="px-3 py-1.5 rounded-lg bg-primary hover:bg-primary/90 text-white text-xxs font-bold shadow transition cursor-pointer shrink-0"
-                >
-                  เชื่อมต่อ IG
-                </button>
-              </div>
-
-              {/* Card 3: LINE OA Connection (Mock) */}
-              <div className="p-5 rounded-xl border border-border bg-muted/15 flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4 relative">
-                <div className="flex items-start gap-3">
-                  <div className="w-8 h-8 rounded-full bg-emerald-500/10 border border-emerald-500/20 flex items-center justify-center text-emerald-500 font-extrabold text-xs shrink-0 mt-0.5 animate-pulse">
-                    L
-                  </div>
-                  <div className="space-y-1">
-                    <div className="flex items-center gap-2">
-                      <h3 className="text-sm font-bold text-foreground">LINE Official Account</h3>
-                    </div>
-                    <p className="text-xxs text-muted-foreground leading-relaxed max-w-xl">
-                      ผูกบัญชี LINE OA เพื่อให้ AI แนะนำตารางการบรอดแคสต์ ส่งโปรโมชั่น หรือจัดทำระบบข้อความตอบกลับหาลูกค้าแบบอัตโนมัติ
-                    </p>
-                  </div>
-                </div>
-                <button
-                  type="button"
-                  onClick={() => toast.info('สิทธิ์การเชื่อมต่อ LINE Official Account ของคุณกำลังอยู่ในระหว่างตรวจสอบสิทธิ์ความปลอดภัยในเครื่องทดสอบนี้')}
-                  className="px-3 py-1.5 rounded-lg bg-emerald-500 hover:bg-emerald-600 text-white text-xxs font-bold shadow transition cursor-pointer shrink-0"
-                >
-                  เชื่อมต่อ LINE
-                </button>
-              </div>
-
-            </div>
+            ) : (
+              <Step4FbConnection
+                fbStatus={fbStatus}
+                fbPages={fbPages}
+                loadingPages={loadingPages}
+                selectedFbPageId={selectedFbPageId}
+                setSelectedFbPageId={setSelectedFbPageId}
+                onConnectOAuth={handleConnectFacebookOAuth}
+                onFinalize={handleFinalizeFacebook}
+                loading={loading}
+                hideBack={true}
+                finalizeText="บันทึกการผูกเพจ Facebook"
+              />
+            )}
           </div>
         )}
 

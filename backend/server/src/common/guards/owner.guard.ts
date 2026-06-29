@@ -81,13 +81,6 @@ export class OwnerGuard implements CanActivate {
         );
         return row[0]?.owner_id ?? null;
       }
-      case 'content-plan': {
-        const row = await this.dataSource.query(
-          'SELECT b.owner_id FROM content_plans cp JOIN businesses b ON b.id = cp.business_id WHERE cp.id = $1',
-          [resourceId],
-        );
-        return row[0]?.owner_id ?? null;
-      }
       default:
         return null;
     }
