@@ -44,10 +44,24 @@ X-Internal-Token: <INTERNAL_TOKEN>
 ```
 (เมื่อ `shouldPost` เป็น false: ส่งเฉพาะ `shouldPost` + `reasoning`)
 
-**Callback ของ Caption:**
+**Callback ของ Caption:** (request ต้องมี `mediaType` = `image` หรือ `short_video`)
 ```json
-{ "jobId": "...", "result": { "caption": "…แคปชั่นภาษาไทยฉบับเต็มพร้อม #hashtag…" } }
+{ "jobId": "...", "result": {
+    "caption": "…แคปชั่นภาษาไทยฉบับเต็มพร้อม #hashtag…",
+    "mediaRequest": {
+      "content_type": "short_video",     // หรือ "image"
+      "aspect_ratio": "9:16",            // image = "4:5"
+      "style": "cinematic_fantasy",
+      "negative_prompt": "blurry, low quality, text, logo, watermark",
+      "prompt": "English scene 1",       // AI Media image branch อ่านฟิลด์นี้
+      "scenes": [ { "prompt": "English scene 1" }, ... ],   // video=4, image=1
+      "metadata": { "campaign_id": "<postId>" }
+    } } }
 ```
+> `mediaRequest` คือ payload สำหรับ AI Media (n8n) โดยตรง (snake_case) scene prompts
+> **ภาษาอังกฤษ** video = 4 ฉาก (ฉากละ ~8 วินาที), image = 1 ฉาก เราส่งทั้ง `prompt`
+> (image branch ใช้) และ `scenes` (video branch ใช้)
+> ⚠️ **backend เติม `callback_url`** ก่อนส่งต่อ (image ตอบใน HTTP response, video ใช้ callback)
 
 **Callback กรณีข้อผิดพลาด (ทั้งสองเซอร์วิส):**
 ```json
@@ -81,6 +95,8 @@ X-Internal-Token: <INTERNAL_TOKEN>
 3. **การ deploy** — เซอร์วิส Python นี้จะรันที่ไหน (host เดียวกัน? container? URL อะไร?)
 4. **ตัวกระตุ้นสำหรับทดสอบ** — ช่วยยิง request Decision จริงมาที่เซอร์วิสที่เรารันอยู่
    เพื่อยืนยันว่า callback ครบวงจร (end-to-end จริง)
+5. **ตกลงเรื่อง `mediaPrompt`** — เราสร้าง prompt ภาษาอังกฤษให้แล้วในผลลัพธ์ของ Caption
+   ต้องคุยกับทีม AI Media ว่าจะรับฟิลด์นี้เข้าไปใน request ของ media generation อย่างไร
 
 ---
 
