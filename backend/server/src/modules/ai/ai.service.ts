@@ -5,7 +5,7 @@ import {
   BadRequestException,
 } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
-import { IsNull, Repository } from 'typeorm';
+import { In, IsNull, Repository } from 'typeorm';
 import { InjectQueue } from '@nestjs/bullmq';
 import { Queue } from 'bullmq';
 import { Post } from '../../database/entities/post.entity';
@@ -28,9 +28,26 @@ export interface DecideDto {
   };
 }
 
+export interface CaptionMediaScene {
+  prompt: string;
+}
+
+// AI-optimised media request produced by the AI Caption service. The contents
+// are the AI Media (n8n) tool's own snake_case format and are forwarded as-is.
+export interface CaptionMediaRequest {
+  content_type: 'image' | 'short_video';
+  aspect_ratio?: string;
+  style?: string;
+  negative_prompt?: string;
+  prompt?: string;
+  master_prompt?: string | null;
+  scenes?: CaptionMediaScene[];
+  metadata?: Record<string, unknown>;
+}
+
 export interface CaptionDto {
   jobId: string;
-  result?: { caption: string };
+  result?: { caption: string; mediaRequest?: CaptionMediaRequest };
   error?: { code: string; message: string };
 }
 
@@ -190,6 +207,23 @@ export class AiService {
     job.status = 'succeeded';
     job.result = { caption };
     await this.jobRepo.save(job);
+
+    // Hand the AI's optimised media request to this post's media job(s) via
+    // their existing payload jsonb, so media.processor forwards the
+    // scenes/master_prompt/style to AI Media (n8n) instead of the raw hint.
+    const mediaRequest = dto.result?.mediaRequest;
+    if (mediaRequest) {
+      const mediaJobs = await this.jobRepo.find({
+        where: { postId: post.id, type: In(['image', 'short_video']) },
+      });
+      for (const mediaJob of mediaJobs) {
+        mediaJob.payload = { ...(mediaJob.payload || {}), mediaRequest };
+        await this.jobRepo.save(mediaJob);
+      }
+      this.logger.log(
+        `Stored mediaRequest on ${mediaJobs.length} media job(s) for post ${post.id}`,
+      );
+    }
 
     this.logger.log(`Caption job ${dto.jobId} succeeded for post ${post.id}`);
     return saved;
