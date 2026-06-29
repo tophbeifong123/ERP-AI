@@ -10,6 +10,7 @@ import { FacebookPage } from '../../database/entities/facebook-page.entity';
 import { File } from '../../database/entities/file.entity';
 import { EncryptionService } from '../../common/crypto/encryption.service';
 import { PostEventsService } from '../posts/post-events.service';
+import { S3Service } from '../files/s3.service';
 
 export interface DispatchJobData {
   postId: string;
@@ -31,6 +32,7 @@ export class DispatchPostProcessor extends WorkerHost {
     @InjectRepository(FacebookPage) private pageRepo: Repository<FacebookPage>,
     private encryption: EncryptionService,
     private postEvents: PostEventsService,
+    private s3Service: S3Service,
   ) {
     super();
   }
@@ -97,33 +99,39 @@ export class DispatchPostProcessor extends WorkerHost {
     const caption = post.caption ?? '';
     const baseUrl = `https://graph.facebook.com/${graphVersion}/${page.fbPageId}`;
     let endpoint = `${baseUrl}/feed`;
-    let body: Record<string, unknown> = { message: caption, access_token: accessToken };
+    let requestOptions: RequestInit;
 
     if (file && mediaRow) {
+      const buffer = await this.s3Service.downloadFile(file.storageKey);
+      const form = new FormData();
+      form.append('access_token', accessToken);
+
       if (mediaRow.kind === 'image') {
         endpoint = `${baseUrl}/photos`;
-        body = {
-          caption,
-          access_token: accessToken,
-          url: file.publicUrl,
-          published: true,
-        };
+        form.append('caption', caption);
+        form.append('published', 'true');
       } else if (mediaRow.kind === 'short_video') {
         endpoint = `${baseUrl}/videos`;
-        body = {
-          description: caption,
-          access_token: accessToken,
-          file_url: file.publicUrl,
-        };
+        form.append('description', caption);
       }
+
+      const blob = new Blob([new Uint8Array(buffer)], { type: file.mime });
+      form.append('source', blob, file.storageKey.split('/').pop() || 'file');
+
+      requestOptions = {
+        method: 'POST',
+        body: form,
+      };
+    } else {
+      requestOptions = {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ message: caption, access_token: accessToken }),
+      };
     }
 
     try {
-      const res = await fetch(endpoint, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(body),
-      });
+      const res = await fetch(endpoint, requestOptions);
       const data = (await res.json()) as { id?: string } & FbErrorBody;
       if (!res.ok || !data.id) {
         const msg =

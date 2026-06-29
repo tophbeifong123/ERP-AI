@@ -159,6 +159,23 @@ export class S3Service implements OnModuleInit {
     return getSignedUrl(this.presignClient, command, { expiresIn });
   }
 
+  async downloadFile(key: string): Promise<Buffer> {
+    const command = new GetObjectCommand({
+      Bucket: this.bucket,
+      Key: key,
+    });
+    const response = await this.client.send(command);
+    const stream = response.Body;
+    if (!stream) {
+      throw new Error(`S3 download file ${key} empty body`);
+    }
+    const chunks: Buffer[] = [];
+    for await (const chunk of stream as any) {
+      chunks.push(Buffer.from(chunk));
+    }
+    return Buffer.concat(chunks);
+  }
+
   async deleteFile(key: string): Promise<void> {
     await this.client.send(
       new DeleteObjectCommand({

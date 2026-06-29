@@ -25,3 +25,6 @@ export { EmailLog } from './email-log.entity';
 export type { EmailLogStatus } from './email-log.entity';
 export { Unsubscribe } from './unsubscribe.entity';
 export type { UnsubscribeCategory } from './unsubscribe.entity';
+export { ContentPlan } from './content-plan.entity';
+export type { ContentPlanStatus } from './content-plan.entity';
+

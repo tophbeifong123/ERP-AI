@@ -216,7 +216,7 @@
     },
     {
       "parameters": {
-        "url": "={{ $json.referenceImageUrls }}",
+        "url": "={{ $json.referenceImageUrls.replace('localhost:9000', 'minio:9000') }}",
         "options": {
           "response": {
             "response": {
@@ -525,7 +525,7 @@
     },
     {
       "parameters": {
-        "url": "={{ (() => {  const u = ($('Validate Input').first().json.referenceImageUrls[0]) || '';  if (!u.startsWith('gs://')) return u;  const rest = u.slice(5);  const slash = rest.indexOf('/');  if (slash < 0) return u;  const bucket = rest.slice(0, slash);  const obj = rest.slice(slash + 1);  return `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodeURIComponent(obj)}?alt=media`;})() }}",
+        "url": "={{ (() => {  const u = ($('Validate Input').first().json.referenceImageUrls[0]) || '';  if (!u.startsWith('gs://')) return u.replace('localhost:9000', 'minio:9000');  const rest = u.slice(5);  const slash = rest.indexOf('/');  if (slash < 0) return u;  const bucket = rest.slice(0, slash);  const obj = rest.slice(slash + 1);  return `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodeURIComponent(obj)}?alt=media`;})() }}",
         "options": {
           "response": {
             "response": {

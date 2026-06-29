@@ -90,6 +90,10 @@ export class MediaProcessor extends WorkerHost {
       })),
     );
 
+    const referenceImageUrls = featuredServices
+      .map((s) => s.imagePublicUrl)
+      .filter((url): url is string => typeof url === 'string' && url.length > 0);
+
     // 3) Compose payload for n8n webhook (matches docs/contracts/AI-MEDIA.md)
     const aiMediaUrl = this.configService.get<string>('app.ai.mediaUrl');
     const internalKey = this.configService.get<string>('app.internalApiKey');
@@ -119,13 +123,18 @@ export class MediaProcessor extends WorkerHost {
         keywords: business.keywords ?? [],
         logoPublicUrl,
       },
+      prompt:
+        (aiJob.payload?.hint as string | undefined) ??
+        (aiJob.payload?.captionHint as string | undefined) ??
+        post.caption ??
+        '',
       hint:
         (aiJob.payload?.hint as string | undefined) ??
         (aiJob.payload?.captionHint as string | undefined) ??
         null,
       caption: post.caption ?? '',
       featuredServices,
-      referenceImageUrls: [],
+      referenceImageUrls,
     };
 
     // 4) Persist a snapshot for debugging / replay

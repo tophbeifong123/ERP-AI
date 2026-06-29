@@ -26,6 +26,15 @@ import { Service } from '@/core/types/service';
 import { serviceService } from '@/core/services/service-service';
 import { PostMediaPreview } from '@/components/features/posts/post-media-preview';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 type FilterStatus =
   | 'all'
@@ -74,6 +83,7 @@ export default function PostsPage() {
   const [editServiceIds, setEditServiceIds] = useState<string[]>([]);
   const [editLoading, setEditLoading] = useState(false);
   const [availableServices, setAvailableServices] = useState<Service[]>([]);
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
 
   const activeBusinessId = activeBusiness?.id;
 
@@ -152,9 +162,14 @@ export default function PostsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('คุณต้องการลบโพสต์รายการนี้ออกจากคิวใช่หรือไม่?'))
-      return;
+  const handleDeleteClick = (id: string) => {
+    setDeletingPostId(id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingPostId) return;
+    const id = deletingPostId;
+    setDeletingPostId(null);
     setActionLoading(id);
     try {
       await postService.deletePost(id);
@@ -460,10 +475,10 @@ export default function PostsPage() {
                     </>
                   )}
 
-                  {post.status === 'failed' && (
+                  {['approved', 'failed', 'rejected', 'expired'].includes(post.status) && (
                     <button
                       type="button"
-                      onClick={() => handleDelete(post.id)}
+                      onClick={() => handleDeleteClick(post.id)}
                       disabled={actionLoading !== null}
                       className="p-2 rounded-lg bg-secondary hover:bg-red-500/10 border border-border hover:border-red-500/20 text-muted-foreground hover:text-red-500 transition cursor-pointer disabled:opacity-50 flex items-center gap-1 text-xs font-semibold"
                     >
@@ -616,6 +631,36 @@ export default function PostsPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deletingPostId} onOpenChange={(open) => !open && setDeletingPostId(null)}>
+        <DialogContent className="max-w-md w-full glass-panel glow-indigo rounded-2xl p-6 shadow-2xl animate-scale-up space-y-4">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-lg font-bold text-foreground">
+              ยืนยันการลบโพสต์
+            </DialogTitle>
+            <DialogDescription className="text-sm text-muted-foreground">
+              คุณแน่ใจหรือไม่ว่าต้องการลบโพสต์รายการนี้ออกจากคิวงาน? หากลบโพสต์ที่อนุมัติแล้ว ระบบจะถอนโพสต์ออกจากตารางการเผยแพร่บน Facebook โดยอัตโนมัติ และการดำเนินการนี้จะไม่สามารถกู้คืนได้
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeletingPostId(null)}
+              className="cursor-pointer"
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              className="bg-red-500 hover:bg-red-600 text-white border-transparent cursor-pointer"
+            >
+              ยืนยันการลบ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

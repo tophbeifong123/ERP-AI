@@ -31,7 +31,7 @@ export type PostType =
   | 'brand_awareness'
   | 'event';
 export type PostMediaType = 'image' | 'short_video';
-export type GenerationSource = 'manual';
+export type GenerationSource = 'auto_ai' | 'fixed_schedule' | 'manual';
 export type RejectionReason = 'user_rejected' | 'timeout';
 
 @Entity('posts')

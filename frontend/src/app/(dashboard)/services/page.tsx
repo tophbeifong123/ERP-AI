@@ -11,8 +11,6 @@ import {
   X, 
   Loader2, 
   Check, 
-  ToggleLeft, 
-  ToggleRight 
 } from 'lucide-react';
 import { useBusinessStore } from '@/hooks/store/use-business-store';
 import { serviceService } from '@/core/services/service-service';
@@ -21,6 +19,7 @@ import { toast } from 'sonner';
 import { useForm } from 'react-hook-form';
 import { zodResolver } from '@hookform/resolvers/zod';
 import { serviceSchema, ServiceInput } from '@/core/validations/service-schema';
+import { Switch } from '@/components/ui/switch';
 
 export default function ServicesPage() {
   const { activeBusiness } = useBusinessStore();
@@ -247,22 +246,18 @@ export default function ServicesPage() {
 
                 {/* Footer Controls */}
                 <div className="flex items-center justify-between border-t border-border/40 pt-3">
-                  <button
-                    onClick={() => handleToggleActive(item)}
-                    className="flex items-center gap-1 text-xxs text-muted-foreground hover:text-foreground transition cursor-pointer"
-                  >
-                    {item.isActive ? (
-                      <>
-                        <ToggleRight className="w-5 h-5 text-emerald-500" />
-                        <span className="font-semibold text-emerald-500">เปิดการขาย</span>
-                      </>
-                    ) : (
-                      <>
-                        <ToggleLeft className="w-5 h-5" />
-                        <span>ปิดชั่วคราว</span>
-                      </>
-                    )}
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <Switch
+                      checked={item.isActive}
+                      onCheckedChange={() => handleToggleActive(item)}
+                      aria-label="สลับสถานะสินค้า"
+                    />
+                    <span className={`text-xxs font-semibold transition-colors ${
+                      item.isActive ? 'text-emerald-500' : 'text-muted-foreground'
+                    }`}>
+                      {item.isActive ? 'เปิดการขาย' : 'ปิดชั่วคราว'}
+                    </span>
+                  </div>
 
                   <div className="flex items-center gap-1.5">
                     <button
