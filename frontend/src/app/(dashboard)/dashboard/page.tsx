@@ -28,6 +28,20 @@ import { PostMediaPreview } from '@/components/features/posts/post-media-preview
 import { Service } from '@/core/types/service';
 import { serviceService } from '@/core/services/service-service';
 
+const LineIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="currentColor" {...props}>
+    <path d="M24 10.304c0-5.369-5.383-9.738-12-9.738-6.616 0-12 4.369-12 9.738 0 4.814 4.269 8.846 10.036 9.564.39.084.922.258 1.057.592.12.303.079.778.038 1.084-.131.968-.537 3.868-.537 3.868s-.167 1.002.696.58c.864-.422 4.658-2.732 6.357-4.18 1.353-.081 2.686-.39 3.896-.913 4.148-1.789 6.457-5.074 6.457-8.991zm-15.364.717h-1.579c-.276 0-.5.224-.5.5v3.197c0 .276.224.5.5.5h1.579c.276 0 .5-.224.5-.5v-.324c0-.276-.224-.5-.5-.5h-1.079v-.748h1.079c.276 0 .5-.224.5-.5v-.324c0-.276-.224-.5-.5-.5h-1.079v-.601h1.079c.276 0 .5-.224.5-.5v-.324c0-.276-.224-.5-.5-.5zm2.935 0h-.325c-.276 0-.5.224-.5.5v3.697c0 .276.224.5.5.5h.325c.276 0 .5-.224.5-.5v-3.697c0-.276-.224-.5-.5-.5zm4.07 0h-.326c-.276 0-.5.224-.5.5v2.247l-2.001-2.61c-.083-.111-.212-.178-.349-.178-.067 0-.135.016-.197.048-.184.093-.298.283-.298.49v3.697c0 .276.224.5.5.5h.325c.276 0 .5-.224.5-.5v-2.247l2.001 2.61c.083.111.212.178.349.178.067 0 .135-.016.197-.048.184-.093.298-.283.298-.49v-3.697c0-.276-.224-.5-.5-.5zm4.07 0h-1.579c-.276 0-.5.224-.5.5v3.197c0 .276.224.5.5.5h1.579c.276 0 .5-.224.5-.5v-.324c0-.276-.224-.5-.5-.5h-1.079v-.748h1.079c.276 0 .5-.224.5-.5v-.324c0-.276-.224-.5-.5-.5h-1.079v-.601h1.079c.276 0 .5-.224.5-.5v-.324c0-.276-.224-.5-.5-.5z" />
+  </svg>
+);
+
+const InstagramIcon = (props: React.SVGProps<SVGSVGElement>) => (
+  <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" {...props}>
+    <rect x="2" y="2" width="20" height="20" rx="5" ry="5" />
+    <path d="M16 11.37A4 4 0 1 1 12.63 8 4 4 0 0 1 16 11.37z" />
+    <line x1="17.5" y1="6.5" x2="17.51" y2="6.5" />
+  </svg>
+);
+
 export default function DashboardPage() {
   const router = useRouter();
   const { activeBusiness } = useBusinessStore();
@@ -38,6 +52,16 @@ export default function DashboardPage() {
   const [services, setServices] = useState<Service[]>([]);
 
   const activeBusinessId = activeBusiness?.id;
+
+  const [isLineConnected, setIsLineConnected] = useState(false);
+  const [isIgConnected, setIsIgConnected] = useState(false);
+
+  useEffect(() => {
+    if (typeof window !== 'undefined') {
+      setIsLineConnected(localStorage.getItem('is_line_connected') === 'true');
+      setIsIgConnected(localStorage.getItem('is_ig_connected') === 'true');
+    }
+  }, []);
 
   const loadPosts = async () => {
     if (!activeBusinessId) return;
@@ -238,7 +262,19 @@ export default function DashboardPage() {
                             <span className="text-xxs font-bold text-sky-500 bg-sky-500/10 px-2 py-0.5 rounded">อนุมัติแล้ว (รอคิวโพสต์)</span>
                           )}
                           {post.status === 'posted' && (
-                            <span className="text-xxs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">โพสต์สำเร็จ</span>
+                            post.fbPostId ? (
+                              <a
+                                href={`https://facebook.com/${post.fbPostId}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="text-xxs font-bold text-emerald-500 bg-emerald-500/10 hover:bg-emerald-500/20 px-2 py-0.5 rounded inline-flex items-center gap-1 transition cursor-pointer"
+                              >
+                                <span>โพสต์สำเร็จ</span>
+                                <ArrowUpRight className="w-3 h-3" />
+                              </a>
+                            ) : (
+                              <span className="text-xxs font-bold text-emerald-500 bg-emerald-500/10 px-2 py-0.5 rounded">โพสต์สำเร็จ</span>
+                            )
                           )}
                           {post.status === 'failed' && (
                             <span className="text-xxs font-bold text-red-500 bg-red-500/10 px-2 py-0.5 rounded">เกิดข้อผิดพลาด</span>
@@ -296,8 +332,13 @@ export default function DashboardPage() {
           
           <div className="space-y-3">
             {activePage ? (
-              <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/35">
-                <div className="flex items-center gap-2.5">
+              <a
+                href={`https://facebook.com/${activePage.fbPageId}`}
+                target="_blank"
+                rel="noopener noreferrer"
+                className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/35 hover:bg-muted/50 transition cursor-pointer"
+              >
+                <div className="flex items-center gap-2.5 min-w-0">
                   <div className="w-8 h-8 rounded-full border border-border overflow-hidden shrink-0 flex items-center justify-center">
                     {activePage.pictureUrl ? (
                       <img src={activePage.pictureUrl} alt={activePage.pageName} className="w-full h-full object-cover" />
@@ -307,13 +348,13 @@ export default function DashboardPage() {
                       </div>
                     )}
                   </div>
-                  <div>
+                  <div className="min-w-0">
                     <span className="block text-xs font-bold text-foreground line-clamp-1">{activePage.pageName}</span>
                     <span className="block text-xxs text-emerald-500">เชื่อมต่อ Facebook สำเร็จ</span>
                   </div>
                 </div>
                 <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 block shrink-0" />
-              </div>
+              </a>
             ) : (
               <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/35 gap-2">
                 <div className="flex items-center gap-2.5">
@@ -334,18 +375,73 @@ export default function DashboardPage() {
               </div>
             )}
 
-            <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/35 opacity-50">
-              <div className="flex items-center gap-2.5">
-                <div className="w-8 h-8 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center text-green-600 dark:text-green-400 font-extrabold text-xs shrink-0">
-                  L
+            {/* LINE OA Connection Status */}
+            {isLineConnected ? (
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/35 animate-fade-in">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-[#06C755]/10 border border-[#06C755]/20 flex items-center justify-center text-[#06C755] shrink-0">
+                    <LineIcon className="w-4.5 h-4.5 fill-current" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block text-xs font-bold text-foreground truncate">{activeBusiness?.name || 'ธุรกิจ'} Official</span>
+                    <span className="block text-xxs text-emerald-500 truncate">เชื่อมต่อ LINE OA สำเร็จ</span>
+                  </div>
                 </div>
-                <div>
-                  <span className="block text-xs font-bold text-foreground">LINE OA</span>
-                  <span className="block text-xxs text-muted-foreground">ยังไม่เชื่อมต่อ</span>
-                </div>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 block shrink-0" />
               </div>
-              <span className="w-2 h-2 rounded-full bg-muted-foreground block shrink-0" />
-            </div>
+            ) : (
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/35 opacity-50 gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-green-500/10 border border-green-500/20 flex items-center justify-center text-green-600 dark:text-green-400 font-extrabold text-xs shrink-0">
+                    L
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block text-xs font-bold text-foreground truncate">LINE OA</span>
+                    <span className="block text-xxs text-muted-foreground truncate">ยังไม่เชื่อมต่อ</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => router.push('/settings?tab=facebook')}
+                  className="px-2.5 py-1 rounded bg-[#06C755] hover:bg-[#06C755]/90 text-xxs font-bold text-white shadow shrink-0 cursor-pointer transition"
+                >
+                  เชื่อมต่อ
+                </button>
+              </div>
+            )}
+
+            {/* Instagram Connection Status */}
+            {isIgConnected ? (
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/35 animate-fade-in">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-500 shrink-0">
+                    <InstagramIcon className="w-4.5 h-4.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block text-xs font-bold text-foreground truncate">@{activeBusiness?.name?.toLowerCase() || 'shop'}_store</span>
+                    <span className="block text-xxs text-emerald-500 truncate">เชื่อมต่อ Instagram สำเร็จ</span>
+                  </div>
+                </div>
+                <span className="w-2 h-2 rounded-full bg-emerald-500 dark:bg-emerald-400 block shrink-0" />
+              </div>
+            ) : (
+              <div className="flex items-center justify-between p-3 rounded-lg border border-border bg-muted/35 opacity-50 gap-2">
+                <div className="flex items-center gap-2.5 min-w-0">
+                  <div className="w-8 h-8 rounded-full bg-pink-500/10 border border-pink-500/20 flex items-center justify-center text-pink-500 shrink-0">
+                    <InstagramIcon className="w-4.5 h-4.5" />
+                  </div>
+                  <div className="min-w-0">
+                    <span className="block text-xs font-bold text-foreground truncate">Instagram</span>
+                    <span className="block text-xxs text-muted-foreground truncate">ยังไม่เชื่อมต่อ</span>
+                  </div>
+                </div>
+                <button
+                  onClick={() => router.push('/settings?tab=facebook')}
+                  className="px-2.5 py-1 rounded bg-gradient-to-r from-[#833AB4] to-[#F56040] hover:opacity-90 text-xxs font-bold text-white shadow shrink-0 cursor-pointer transition"
+                >
+                  เชื่อมต่อ
+                </button>
+              </div>
+            )}
           </div>
         </div>
 

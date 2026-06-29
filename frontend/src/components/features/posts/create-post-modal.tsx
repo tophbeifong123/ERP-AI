@@ -129,19 +129,19 @@ export default function CreatePostModal({
 
   return (
     <div
-      className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4"
+      className="fixed inset-0 bg-black/70 backdrop-blur-sm z-50 flex items-center justify-center p-4"
       onClick={(e) => {
         if (e.target === e.currentTarget) handleClose();
       }}
     >
-      <div className="max-w-2xl w-full glass-panel glow-indigo rounded-2xl p-6 sm:p-8 shadow-2xl space-y-5 animate-scale-up max-h-[92vh] overflow-y-auto">
+      <div className="max-w-2xl w-full bg-white rounded-2xl p-6 sm:p-8 shadow-2xl border border-neutral-100 space-y-5 animate-scale-up max-h-[92vh] overflow-y-auto">
         <div className="flex justify-between items-start">
           <div>
-            <h3 className="text-lg font-bold text-foreground flex items-center gap-2">
+            <h3 className="text-lg font-bold text-neutral-900 flex items-center gap-2">
               <Sparkles className="w-5 h-5 text-primary" />
               สร้างโพสต์ด้วย AI
             </h3>
-            <p className="text-xs text-muted-foreground mt-1">
+            <p className="text-xs text-neutral-500 mt-1">
               พิมพ์คำอธิบายสั้นๆ → เลือกรูปแบบสื่อ → AI จะช่วยเขียนแคปชั่น สร้างสื่อ และแนะนำเวลาโพสต์ที่เหมาะสม
             </p>
           </div>
@@ -149,7 +149,7 @@ export default function CreatePostModal({
             type="button"
             onClick={handleClose}
             disabled={loading}
-            className="text-muted-foreground hover:text-foreground p-1 cursor-pointer disabled:opacity-50"
+            className="text-neutral-400 hover:text-neutral-600 p-1 cursor-pointer disabled:opacity-50 transition"
             aria-label="Close"
           >
             <X className="w-5 h-5" />
@@ -159,9 +159,9 @@ export default function CreatePostModal({
         <form onSubmit={handleSubmit} className="space-y-5">
           {/* Hint textarea */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+            <label className="text-xs font-semibold text-neutral-800 flex items-center justify-between">
               <span>คำอธิบายสั้นๆ สำหรับ AI *</span>
-              <span className="text-xxs text-muted-foreground">
+              <span className="text-xxs text-neutral-400">
                 {hint.length} / 500
               </span>
             </label>
@@ -171,14 +171,14 @@ export default function CreatePostModal({
               onChange={(e) => setHint(e.target.value)}
               disabled={loading}
               placeholder='เช่น "โปรโมชั่นข้าวแกง ลด 50% วันศุกร์นี้ ฟรีค่าส่ง สั่งขั้นต่ำ 200 บาท"'
-              className="w-full px-3.5 py-2.5 rounded-lg border border-border bg-background text-sm text-foreground outline-none focus:border-primary focus:ring-1 focus:ring-primary resize-none leading-relaxed"
+              className="w-full px-3.5 py-2.5 rounded-lg border border-neutral-200 bg-neutral-50 text-sm text-neutral-950 placeholder-neutral-400 outline-none focus:border-primary focus:bg-white focus:ring-1 focus:ring-primary resize-none leading-relaxed transition"
               required
             />
           </div>
 
           {/* Post type */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-foreground">
+            <label className="text-xs font-semibold text-neutral-800">
               ประเภทโพสต์
             </label>
             <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
@@ -192,12 +192,12 @@ export default function CreatePostModal({
                     onClick={() => setPostType(opt.value)}
                     className={`p-2.5 rounded-lg border text-left transition cursor-pointer disabled:opacity-50 ${
                       selected
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border bg-muted/20 text-muted-foreground hover:bg-muted/40'
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
                     }`}
                   >
                     <span className="block text-xs font-bold">{opt.label}</span>
-                    <span className="block text-[10px] leading-snug mt-0.5 opacity-80">
+                    <span className={`block text-[10px] leading-snug mt-0.5 opacity-80 ${selected ? 'text-primary' : 'text-neutral-500'}`}>
                       {opt.description}
                     </span>
                   </button>
@@ -208,7 +208,7 @@ export default function CreatePostModal({
 
           {/* Media type */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-foreground">
+            <label className="text-xs font-semibold text-neutral-800">
               รูปแบบสื่อ
             </label>
             <div className="grid grid-cols-2 gap-2">
@@ -238,14 +238,14 @@ export default function CreatePostModal({
                     onClick={() => setMediaType(opt.value)}
                     className={`flex items-start gap-2.5 p-3 rounded-lg border text-left transition cursor-pointer disabled:opacity-50 ${
                       selected
-                        ? 'border-primary bg-primary/10 text-primary'
-                        : 'border-border bg-muted/20 text-muted-foreground hover:bg-muted/40'
+                        ? 'border-primary bg-primary/5 text-primary'
+                        : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
                     }`}
                   >
                     <Icon className="w-4 h-4 mt-0.5 shrink-0" />
                     <div className="min-w-0">
                       <span className="block text-xs font-bold">{opt.label}</span>
-                      <span className="block text-[10px] leading-snug mt-0.5 opacity-80">
+                      <span className={`block text-[10px] leading-snug mt-0.5 opacity-80 ${selected ? 'text-primary' : 'text-neutral-500'}`}>
                         {opt.hint}
                       </span>
                     </div>
@@ -257,15 +257,15 @@ export default function CreatePostModal({
 
           {/* Featured services */}
           <div className="space-y-2">
-            <label className="text-xs font-semibold text-foreground flex items-center justify-between">
+            <label className="text-xs font-semibold text-neutral-800 flex items-center justify-between">
               <span>สินค้า/บริการที่นำเสนอ (เลือกได้หลายรายการ)</span>
-              <span className="text-xxs text-muted-foreground">
+              <span className="text-xxs text-neutral-400">
                 เลือกแล้ว {selectedServiceIds.length}
               </span>
             </label>
             {internalServices.length === 0 ? (
-              <div className="p-4 rounded-lg border border-dashed border-border bg-muted/10 text-center">
-                <p className="text-xs text-muted-foreground">
+              <div className="p-4 rounded-lg border border-dashed border-neutral-200 bg-neutral-50 text-center">
+                <p className="text-xs text-neutral-500">
                   ยังไม่มีสินค้า/บริการ — AI จะเขียนโพสต์แบบทั่วไป
                 </p>
               </div>
@@ -281,8 +281,8 @@ export default function CreatePostModal({
                       onClick={() => toggleService(s.id)}
                       className={`inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg border text-xs font-semibold transition cursor-pointer disabled:opacity-50 ${
                         selected
-                          ? 'border-primary bg-primary/10 text-primary'
-                          : 'border-border bg-muted/20 text-muted-foreground hover:bg-muted/40'
+                          ? 'border-primary bg-primary/5 text-primary'
+                          : 'border-neutral-200 bg-neutral-50 text-neutral-600 hover:bg-neutral-100 hover:text-neutral-900'
                       }`}
                     >
                       {selected && <Check className="w-3 h-3" />}
@@ -300,7 +300,7 @@ export default function CreatePostModal({
               type="button"
               onClick={handleClose}
               disabled={loading}
-              className="px-4 py-2 rounded-lg border border-border text-xs font-semibold text-foreground hover:bg-muted transition cursor-pointer disabled:opacity-50"
+              className="px-4 py-2 rounded-lg border border-neutral-200 text-xs font-semibold text-neutral-700 bg-white hover:bg-neutral-50 transition cursor-pointer disabled:opacity-50"
             >
               ยกเลิก
             </button>

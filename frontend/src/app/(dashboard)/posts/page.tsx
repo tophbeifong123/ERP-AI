@@ -87,16 +87,16 @@ export default function PostsPage() {
 
   const activeBusinessId = activeBusiness?.id;
 
-  const loadPosts = async () => {
+  const loadPosts = async (silent = false) => {
     if (!activeBusinessId) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const data = await postService.getPosts({ businessId: activeBusinessId });
       setPosts(data);
     } catch {
-      toast.error('ไม่สามารถโหลดตารางแผนงานโพสต์ได้');
+      if (!silent) toast.error('ไม่สามารถโหลดตารางแผนงานโพสต์ได้');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -110,27 +110,18 @@ export default function PostsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBusinessId]);
 
-  // 3-second polling while any post is in 'generating'
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Poll silently in the background every 3 seconds while any post is in 'generating' state
   useEffect(() => {
     const hasGenerating = posts.some((p) => p.status === 'generating');
-    if (hasGenerating && !pollRef.current) {
-      pollRef.current = setInterval(() => {
-        loadPosts();
-      }, 3000);
-    }
-    if (!hasGenerating && pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
+    if (!hasGenerating) return;
+
+    const timer = setTimeout(() => {
+      loadPosts(true); // Poll silently in the background
+    }, 3000);
+
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posts]);
+  }, [posts, activeBusinessId]);
 
   const handleApprove = async (id: string) => {
     setActionLoading(id);
@@ -475,7 +466,7 @@ export default function PostsPage() {
                     </>
                   )}
 
-                  {['approved', 'failed', 'rejected', 'expired'].includes(post.status) && (
+                  {['approved', 'failed', 'rejected', 'expired', 'generating', 'draft'].includes(post.status) && (
                     <button
                       type="button"
                       onClick={() => handleDeleteClick(post.id)}
@@ -634,12 +625,12 @@ export default function PostsPage() {
 
       {/* Delete Confirmation Dialog */}
       <Dialog open={!!deletingPostId} onOpenChange={(open) => !open && setDeletingPostId(null)}>
-        <DialogContent className="max-w-md w-full glass-panel glow-indigo rounded-2xl p-6 shadow-2xl animate-scale-up space-y-4">
+        <DialogContent className="max-w-md w-full bg-white rounded-2xl p-6 shadow-2xl border border-neutral-100 animate-scale-up space-y-4">
           <DialogHeader className="space-y-2">
-            <DialogTitle className="text-lg font-bold text-foreground">
+            <DialogTitle className="text-lg font-bold text-neutral-900">
               ยืนยันการลบโพสต์
             </DialogTitle>
-            <DialogDescription className="text-sm text-muted-foreground">
+            <DialogDescription className="text-xs text-neutral-500 leading-relaxed">
               คุณแน่ใจหรือไม่ว่าต้องการลบโพสต์รายการนี้ออกจากคิวงาน? หากลบโพสต์ที่อนุมัติแล้ว ระบบจะถอนโพสต์ออกจากตารางการเผยแพร่บน Facebook โดยอัตโนมัติ และการดำเนินการนี้จะไม่สามารถกู้คืนได้
             </DialogDescription>
           </DialogHeader>
@@ -647,7 +638,7 @@ export default function PostsPage() {
             <Button
               variant="outline"
               onClick={() => setDeletingPostId(null)}
-              className="cursor-pointer"
+              className="cursor-pointer border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700"
             >
               ยกเลิก
             </Button>
