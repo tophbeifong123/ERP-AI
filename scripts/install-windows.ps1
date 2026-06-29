@@ -64,6 +64,8 @@ if (-not (Test-Path "node_modules")) {
 
 Write-Host ""
 Write-Host "2. Building backend (nest build -> dist/main.js)..." -ForegroundColor Yellow
+# CI=true prevents pnpm from prompting for module-dir confirmation (no TTY in PowerShell)
+$env:CI = 'true'
 & pnpm build
 if ($LASTEXITCODE -ne 0) { Write-Host "  [FAIL] pnpm build failed" -ForegroundColor Red; exit 1 }
 if (-not (Test-Path "dist\main.js")) {
@@ -84,6 +86,13 @@ if (-not (Test-Path "node_modules")) {
 } else {
     Write-Host "  [SKIP] node_modules already exists" -ForegroundColor DarkGray
 }
+
+# Pre-approve build scripts (pnpm 11 requires this; without it pnpm dev will
+# prompt on first run which won't work in a non-interactive PowerShell).
+# Idempotent - safe to run every time, no-op if already approved.
+$env:CI = 'true'
+& pnpm approve-builds 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) { Write-Host "  [WARN] pnpm approve-builds failed (non-fatal - dev may prompt)" -ForegroundColor Yellow }
 
 # 4. Create frontend/.env if missing -------------------------------------------
 

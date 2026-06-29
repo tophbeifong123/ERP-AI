@@ -19,12 +19,13 @@ Write-Host "1. Freeing ports 3000 / 3001..." -ForegroundColor Yellow
 $busy = Get-NetTCPConnection -LocalPort 3000,3001 -State Listen -ErrorAction SilentlyContinue
 if ($busy) {
     foreach ($c in $busy) {
-        $pid = $c.OwningProcess
+        # NOTE: $pid is a reserved automatic var in PowerShell - use $procId instead
+        $procId = $c.OwningProcess
         try {
-            Stop-Process -Id $pid -Force -ErrorAction Stop
-            Write-Host "  [KILL] PID $pid on port $($c.LocalPort)" -ForegroundColor DarkGray
+            Stop-Process -Id $procId -Force -ErrorAction Stop
+            Write-Host "  [KILL] PID $procId on port $($c.LocalPort)" -ForegroundColor DarkGray
         } catch {
-            Write-Host "  [WARN] could not kill PID $pid (port $($c.LocalPort)): $_" -ForegroundColor Yellow
+            Write-Host "  [WARN] could not kill PID $procId (port $($c.LocalPort)): $_" -ForegroundColor Yellow
         }
     }
 } else {

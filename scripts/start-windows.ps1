@@ -28,12 +28,12 @@ Write-Host "1. Freeing ports 3000 / 3001..." -ForegroundColor Yellow
 $busy = Get-NetTCPConnection -LocalPort 3000,3001 -State Listen -ErrorAction SilentlyContinue
 if ($busy) {
     foreach ($c in $busy) {
-        $pid = $c.OwningProcess
+        $procId = $c.OwningProcess
         try {
-            Stop-Process -Id $pid -Force -ErrorAction Stop
-            Write-Host "  [KILL] PID $pid on port $($c.LocalPort)" -ForegroundColor DarkGray
+            Stop-Process -Id $procId -Force -ErrorAction Stop
+            Write-Host "  [KILL] PID $procId on port $($c.LocalPort)" -ForegroundColor DarkGray
         } catch {
-            Write-Host "  [WARN] could not kill PID $pid (port $($c.LocalPort)): $_" -ForegroundColor Yellow
+            Write-Host "  [WARN] could not kill PID $procId (port $($c.LocalPort)): $_" -ForegroundColor Yellow
         }
     }
     Start-Sleep -Seconds 1
@@ -46,9 +46,12 @@ if ($busy) {
 if (Get-Command wsl.exe -ErrorAction SilentlyContinue) {
     Write-Host ""
     Write-Host "2. Stopping WSL systemd services (best-effort)..." -ForegroundColor Yellow
+    # 'wsl -u root' is safer than '$env:USERNAME' - Windows usernames often
+    # don't have a matching Linux account, which would fail with
+    # 'getpwnam(User) failed'.
     $wslCmd = 'systemctl --user stop erp-ai-backend2 erp-ai-frontend 2>/dev/null; true'
     try {
-        wsl.exe -u $env:USERNAME -- bash -lc $wslCmd 2>&1 | Out-Null
+        wsl.exe -u root -- bash -lc $wslCmd 2>&1 | Out-Null
         Write-Host "  [ OK ] WSL services stopped (or already stopped)" -ForegroundColor DarkGray
     } catch {
         Write-Host "  [WARN] could not stop WSL services: $_" -ForegroundColor Yellow
@@ -112,7 +115,7 @@ if (-not (Test-Path $envFile)) {
     "NEXT_PUBLIC_API_URL=http://localhost:3000" | Out-File $envFile -Encoding utf8
 }
 
-$frontendCmd = "Set-Location '$frontendDir'; `$env:PORT=3001; pnpm dev -- -p 3001 2>&1 | Tee-Object -FilePath '$root\frontend-dev.log' -Append; Write-Host ''; Write-Host 'Frontend exited. Press any key to close.'; `$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')"
+$frontendCmd = "Set-Location '$frontendDir'; `$env:PORT=3001; `$env:CI='true'; node ./node_modules/next/dist/bin/next dev -p 3001 2>&1 | Tee-Object -FilePath '$root\frontend-dev.log' -Append; Write-Host ''; Write-Host 'Frontend exited. Press any key to close.'; `$null = `$Host.UI.RawUI.ReadKey('NoEcho,IncludeKeyDown')"
 Start-Process powershell -ArgumentList @(
     "-NoExit", "-Command", $frontendCmd
 ) -WorkingDirectory $frontendDir -WindowStyle Normal
@@ -123,18 +126,34 @@ Write-Host "  [ OK ] frontend starting (check new window)" -ForegroundColor Dark
 
 Write-Host ""
 Write-Host "6. Probing ports (waiting up to 20 s)..." -ForegroundColor Yellow
+# Test-NetTCP is missing on PowerShell ISE / older editions. Fall back to
+# a pure-.NET TCP probe that works everywhere.
+function Test-PortOpen {
+    param([int]$Port)
+    $client = New-Object System.Net.Sockets.TcpClient
+    try {
+        $iar = $client.BeginConnect('127.0.0.1', $Port, $null, $null)
+        $ok = $iar.AsyncWaitHandle.WaitOne(500, $false) -and $client.Connected
+        if ($ok) { $client.EndConnect($iar) }
+        return $ok
+    } catch {
+        return $false
+    } finally {
+        $client.Close()
+    }
+}
 $backendUp = $false
 $frontendUp = $false
 for ($i = 0; $i -lt 20; $i++) {
     Start-Sleep -Seconds 1
-    $b = Test-NetTCP -ComputerName 127.0.0.1 -Port 3000 -InformationLevel Quiet -WarningAction SilentlyContinue
-    $f = Test-NetTCP -ComputerName 127.0.0.1 -Port 3001 -InformationLevel Quiet -WarningAction SilentlyContinue
+    $b = Test-PortOpen 3000
+    $f = Test-PortOpen 3001
     if ($b -and -not $backendUp) { Write-Host "  [ OK ] backend listening on :3000  (after $($i+1)s)" -ForegroundColor Green; $backendUp = $true }
     if ($f -and -not $frontendUp) { Write-Host "  [ OK ] frontend listening on :3001 (after $($i+1)s)" -ForegroundColor Green; $frontendUp = $true }
     if ($backendUp -and $frontendUp) { break }
 }
-if (-not $backendUp) { Write-Host "  [WARN] backend not listening on :3000 after 20 s — check the window for errors" -ForegroundColor Yellow }
-if (-not $frontendUp) { Write-Host "  [WARN] frontend not listening on :3001 after 20 s — check the window for errors" -ForegroundColor Yellow }
+if (-not $backendUp) { Write-Host "  [WARN] backend not listening on :3000 after 20 s - check the window for errors" -ForegroundColor Yellow }
+if (-not $frontendUp) { Write-Host "  [WARN] frontend not listening on :3001 after 20 s - check the window for errors" -ForegroundColor Yellow }
 
 Write-Host ""
 Write-Host "=== Open in your browser ===" -ForegroundColor Cyan
