@@ -134,19 +134,51 @@ venv\Scripts\uvicorn app.main:app --reload
 
 ### Callback (AI → backend)
 
+request มีฟิลด์ `mediaType` = `"image"` หรือ `"short_video"` (backend เป็นผู้กำหนด)
+
 ```json
 {
   "jobId": "7f8e9d0c-...",
-  "result": { "caption": "ศุกร์นี้พบกับโปรสุดคุ้ม! 🍜 ... #กาแฟสด #ดอยช้าง" }
+  "result": {
+    "caption": "ศุกร์นี้พบกับโปรสุดคุ้ม! 🍜 ... #กาแฟสด #ดอยช้าง",
+    "mediaRequest": {
+      "content_type": "short_video",
+      "aspect_ratio": "9:16",
+      "style": "cinematic_fantasy",
+      "negative_prompt": "blurry, low quality, text, logo, watermark",
+      "prompt": "Scene 1: English visual description ...",
+      "master_prompt": "High-level English overview of the whole video (video only)",
+      "scenes": [
+        { "prompt": "Scene 1: English visual description ..." },
+        { "prompt": "Scene 2: ..." },
+        { "prompt": "Scene 3: ..." },
+        { "prompt": "Scene 4: ..." }
+      ],
+      "metadata": { "campaign_id": "post-id" }
+    }
+  }
 }
 ```
 
-แคปชั่นเป็นข้อความเดียว (ฝัง hashtag ไว้ในตัว) ความยาวไม่เกิน 2000 ตัวอักษร
+`caption` เป็นข้อความเดียว (ฝัง hashtag ไว้ในตัว) ความยาวไม่เกิน 2000 ตัวอักษร
 (แนะนำ 100–500 ตัวอักษร) กรณีเกิดข้อผิดพลาด:
 `{ "jobId": "...", "error": { "code": "model_error", "message": "..." } }`
 
-> **เรื่องสื่อ (Media):** เซอร์วิสนี้ **ไม่ได้** เรียก AI Media เอง ฝั่ง backend จะเป็นผู้
-> จัดการการสร้างรูป/วิดีโอแยกต่างหาก (ดู `docs/contracts/AI-MEDIA.md`)
+> **`mediaRequest` (scene prompts ภาษาอังกฤษ):** payload สำหรับ AI Media (n8n) ในรูปแบบ
+> snake_case. `content_type` มาจาก `mediaType` ใน request:
+> `image` → `aspect_ratio` `4:5`, ใช้ฟิลด์ `prompt` (top-level);
+> `short_video` → `aspect_ratio` `9:16`, ใช้ `scenes` 4 ฉาก (ฉากละ ~8 วินาที ต่อเนื่อง)
+> เราส่งทั้ง `prompt` และ `scenes` เพื่อให้เข้ากันได้ทั้งสอง branch ของ AI Media
+> `master_prompt` = ภาพรวมระดับสูงของทั้งคลิป (เฉพาะ video) ที่ AI Media รวมกับแต่ละ scene
+> เป็น "Master brief: ... / Scene instruction: ..." (image จะเป็น null)
+>
+> ⚠️ **หมายเหตุการเชื่อมต่อ:** (1) backend เติม `callback_url` ก่อนส่งต่อ (ใช้กับ video เท่านั้น
+> — image ตอบกลับใน HTTP response เลย); (2) `style` ถูกเลือกโดย AI ให้เหมาะกับสินค้า
+> (fallback `modern_minimal`); (3) image `4:5` ยืนยันแล้วว่าใช้ได้; (4) callback ของ AI Media
+> (Google Drive + n8n) ไม่ตรงกับ `docs/contracts/AI-MEDIA.md` เดิม — doc ควรอัปเดต
+
+> **เรื่องสื่อ (Media):** เซอร์วิสนี้ **ไม่ได้** เรียก AI Media เอง เราเพียงสร้าง `mediaRequest`
+> ให้ ส่วน backend จะเป็นผู้ส่งต่อ (พร้อมเติม `callback_url`) ไปยัง AI Media
 
 ---
 
