@@ -61,6 +61,12 @@ tsconfig.build.tsbuildinfo
 *.seed
 *.pid.lock
 
+# n8n runtime data — bind-mounted to /home/node/.n8n in the n8n container.
+# Contains SQLite DB, execution logs, and cached media files (videos/images
+# from past workflow runs). None of this is source; everything is regenerated
+# on container start. n8n has its own retention/cleanup settings.
+n8n_data/
+
 # AI stubs (mocked services — generated assets)
 ai-stubs/**/dist/
 ai-stubs/**/node_modules/
