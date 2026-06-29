@@ -55,6 +55,10 @@ class MediaRequest(BaseModel):
     # Top-level `prompt` (first scene). The AI Media image branch reads this,
     # while the video branch reads `scenes[]`. We send both for compatibility.
     prompt: str
+    # High-level overview of the whole video ("master brief"). AI Media combines
+    # it with each scene as: "Master brief: ... / Scene instruction: ...".
+    # Set for short_video; None for image.
+    master_prompt: str | None = None
     scenes: list[Scene]
     metadata: dict
     # `callback_url` is intentionally omitted — the backend fills it in before

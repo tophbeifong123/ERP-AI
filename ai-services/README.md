@@ -147,6 +147,7 @@ request มีฟิลด์ `mediaType` = `"image"` หรือ `"short_video
       "style": "cinematic_fantasy",
       "negative_prompt": "blurry, low quality, text, logo, watermark",
       "prompt": "Scene 1: English visual description ...",
+      "master_prompt": "High-level English overview of the whole video (video only)",
       "scenes": [
         { "prompt": "Scene 1: English visual description ..." },
         { "prompt": "Scene 2: ..." },
@@ -168,6 +169,8 @@ request มีฟิลด์ `mediaType` = `"image"` หรือ `"short_video
 > `image` → `aspect_ratio` `4:5`, ใช้ฟิลด์ `prompt` (top-level);
 > `short_video` → `aspect_ratio` `9:16`, ใช้ `scenes` 4 ฉาก (ฉากละ ~8 วินาที ต่อเนื่อง)
 > เราส่งทั้ง `prompt` และ `scenes` เพื่อให้เข้ากันได้ทั้งสอง branch ของ AI Media
+> `master_prompt` = ภาพรวมระดับสูงของทั้งคลิป (เฉพาะ video) ที่ AI Media รวมกับแต่ละ scene
+> เป็น "Master brief: ... / Scene instruction: ..." (image จะเป็น null)
 >
 > ⚠️ **หมายเหตุการเชื่อมต่อ:** (1) backend เติม `callback_url` ก่อนส่งต่อ (ใช้กับ video เท่านั้น
 > — image ตอบกลับใน HTTP response เลย); (2) `style` ถูกเลือกโดย AI ให้เหมาะกับสินค้า

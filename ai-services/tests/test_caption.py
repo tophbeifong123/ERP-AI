@@ -87,12 +87,14 @@ def test_image_media_request_single_scene(monkeypatch):
     # top-level prompt (read by the AI Media image branch) mirrors the scene
     assert mr.prompt == mr.scenes[0].prompt
     assert mr.negative_prompt == caption_service.NEGATIVE_PROMPT
+    assert mr.master_prompt is None   # images don't use a master prompt
 
 
 def test_video_media_request_four_scenes(monkeypatch):
-    """media_type=short_video -> content_type short_video, 9:16, capped at 4 scenes."""
+    """media_type=short_video -> content_type short_video, 9:16, 4 scenes + master_prompt."""
     fake = json.dumps({
         "caption": "ดูคลิป! #โปร",
+        "masterPrompt": "A cinematic 4-scene vertical video of a cozy coffee ritual, warm tone",
         "scenes": [f"English scene {i}" for i in range(1, 7)],  # model over-produces 6
     })
     monkeypatch.setattr(caption_service.client.chat.completions, "create", _fake_groq(fake))
@@ -102,6 +104,7 @@ def test_video_media_request_four_scenes(monkeypatch):
     assert mr.content_type == "short_video"
     assert mr.aspect_ratio == "9:16"
     assert len(mr.scenes) == caption_service.VIDEO_SCENE_COUNT  # capped to 4
+    assert mr.master_prompt.startswith("A cinematic 4-scene")   # video overview captured
 
 
 def test_uses_ai_chosen_style(monkeypatch):

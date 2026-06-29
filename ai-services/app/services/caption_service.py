@@ -27,6 +27,7 @@ VIDEO_SCENE_COUNT = 4   # each scene ~8s (AI Media limit) -> ~32s total
 IMAGE_SCENE_COUNT = 1
 DEFAULT_STYLE = "modern_minimal"   # fallback if the model doesn't pick a style
 MAX_STYLE_CHARS = 60
+MAX_MASTER_PROMPT_CHARS = 600
 NEGATIVE_PROMPT = "blurry, low quality, text, logo, watermark"
 
 
@@ -52,10 +53,20 @@ def _build_prompt(req: CaptionRequest) -> str:
             f"เริ่ม-กลาง-จบ ให้เห็นสินค้า/บริการ ฉากสุดท้ายให้สื่อ call-to-action "
             f"ด้วย \"ภาพ\" เท่านั้น (เช่น คนยิ้มชูแก้วเชิญชวน) ห้ามใช้ป้าย/ข้อความ/ตัวเลขราคา"
         )
+        # Master prompt = high-level overview of the whole clip (video only).
+        master_instruction = (
+            "\n### 4) masterPrompt (ภาษาอังกฤษ — เฉพาะวิดีโอ)\n"
+            "เขียน \"ภาพรวมระดับสูง\" ของวิดีโอทั้งคลิป เป็นภาษาอังกฤษ 1-2 ประโยค ครอบคลุม: "
+            "subject หลัก, โครงเรื่องโดยรวม (เริ่ม-กลาง-จบ), โทน/อารมณ์, สไตล์ภาพ, แนวตั้ง 9:16. "
+            "ใช้เป็น master brief ที่กำกับทุก scene ให้ไปในทิศทางเดียวกัน (ไม่ใช่การบรรยายฉากใดฉากหนึ่ง)\n"
+        )
+        master_json = '\n  "masterPrompt": "high-level English overview of the whole video",'
     else:
         scene_instruction = (
             f"สร้าง scene ภาษาอังกฤษ {n} ฉาก สำหรับภาพนิ่ง 1 ภาพที่ดึงดูดที่สุด"
         )
+        master_instruction = ""
+        master_json = ""
 
     return f"""คุณเป็นนักการตลาดดิจิทัลมืออาชีพสำหรับธุรกิจ SME ไทย
 และเป็นผู้เชี่ยวชาญการเขียน prompt สร้างภาพ/วิดีโอ (ภาษาอังกฤษ)
@@ -98,16 +109,17 @@ def _build_prompt(req: CaptionRequest) -> str:
 ### 3) style (ภาษาอังกฤษ สั้นๆ)
 เลือก "สไตล์ภาพรวม" ที่เหมาะกับสินค้า/แบรนด์/ประเภทโพสต์มากที่สุด เป็นวลีสั้นๆ ภาษาอังกฤษ
 (เช่น "warm lifestyle photography", "modern minimal product shot", "cinematic food commercial")
-
+{master_instruction}
 ตอบกลับเป็น JSON นี้เท่านั้น (ห้ามมีข้อความอื่น) โดย scenes มี {n} รายการ:
 {{
   "caption": "เนื้อหาแคปชั่นภาษาไทย รวม emoji และ hashtag",
-  "style": "short English style descriptor",
+  "style": "short English style descriptor",{master_json}
   "scenes": ["English scene 1", ...]
 }}"""
 
 
-def _build_media_request(req: CaptionRequest, scene_prompts: list[str], style: str) -> MediaRequest:
+def _build_media_request(req: CaptionRequest, scene_prompts: list[str], style: str,
+                         master_prompt: str | None) -> MediaRequest:
     n = _scene_count(req.media_type)
     cleaned = [p.strip()[:MAX_SCENE_CHARS] for p in scene_prompts if p and p.strip()]
     scenes = [Scene(prompt=p) for p in cleaned[:n]]
@@ -117,6 +129,7 @@ def _build_media_request(req: CaptionRequest, scene_prompts: list[str], style: s
         style=style,
         negative_prompt=NEGATIVE_PROMPT,
         prompt=cleaned[0] if cleaned else "",   # image branch reads this
+        master_prompt=master_prompt,            # video overview; None for image
         scenes=scenes,
         metadata={"campaign_id": req.post_id},
     )
@@ -149,7 +162,11 @@ def build_caption(req: CaptionRequest) -> CaptionResult:
         if caption:
             scene_prompts = data.get("scenes") or []
             style = (data.get("style") or "").strip()[:MAX_STYLE_CHARS] or DEFAULT_STYLE
-            media_request = _build_media_request(req, scene_prompts, style) if scene_prompts else None
+            master_prompt = (data.get("masterPrompt") or "").strip()[:MAX_MASTER_PROMPT_CHARS] or None
+            media_request = (
+                _build_media_request(req, scene_prompts, style, master_prompt)
+                if scene_prompts else None
+            )
             return CaptionResult(caption=caption, media_request=media_request)
     except Exception as e:
         import logging

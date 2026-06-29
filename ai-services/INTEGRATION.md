@@ -54,6 +54,7 @@ X-Internal-Token: <INTERNAL_TOKEN>
       "style": "cinematic_fantasy",
       "negative_prompt": "blurry, low quality, text, logo, watermark",
       "prompt": "English scene 1",       // AI Media image branch อ่านฟิลด์นี้
+      "master_prompt": "overview of whole video",  // video only (image = null)
       "scenes": [ { "prompt": "English scene 1" }, ... ],   // video=4, image=1
       "metadata": { "campaign_id": "<postId>" }
     } } }

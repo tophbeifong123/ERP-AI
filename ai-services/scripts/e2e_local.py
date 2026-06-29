@@ -90,51 +90,24 @@ def check(name: str, ok: bool, detail: str = ""):
     print(f"  [{'PASS' if ok else 'FAIL'}] {name}" + (f" — {detail}" if detail else ""))
 
 
+# A valid caption body — used for the auth checks (rejected before any Groq call).
+_AUTH_BODY = {
+    "callbackUrl": _cb_url("/x"),
+    "jobId": "j", "postId": "p",
+    "business": {"id": "b", "name": "n"},
+    "postType": "promotion",
+}
+
+
 def test_auth_rejects_bad_token(client: TestClient):
-    r = client.post("/api/ai/decision/decide",
-                    json={"callbackUrl": _cb_url("/x"), "planId": "p",
-                          "business": {"id": "b", "name": "n"}},
+    r = client.post("/api/ai/caption/generate", json=_AUTH_BODY,
                     headers={"X-Internal-Token": "wrong"})
     check("Auth rejects wrong token (401)", r.status_code == 401, f"got {r.status_code}")
 
 
 def test_auth_rejects_missing_token(client: TestClient):
-    r = client.post("/api/ai/decision/decide",
-                    json={"callbackUrl": _cb_url("/x"), "planId": "p",
-                          "business": {"id": "b", "name": "n"}})
+    r = client.post("/api/ai/caption/generate", json=_AUTH_BODY)
     check("Auth rejects missing token (401)", r.status_code == 401, f"got {r.status_code}")
-
-
-def test_decision_rule_path_roundtrip(client: TestClient):
-    received.clear()
-    payload = {
-        "callbackUrl": _cb_url("/internal/ai/decide/callback"),
-        "planId": "plan-e2e-1",
-        "business": {"id": "b1", "name": "ร้านทดสอบ", "postsPerWeekTarget": 3, "minGapDays": 1},
-        "recentPosts": [],
-        "postsThisWeek": 3,  # >= target -> rule path, no Groq call
-        "nowIso": "2026-06-28T06:00:00Z",
-        "services": [],
-    }
-    r = client.post("/api/ai/decision/decide", json=payload,
-                    headers={"X-Internal-Token": TOKEN})
-    check("Decision returns 202 Accepted", r.status_code == 202, f"got {r.status_code}")
-    check("202 body echoes planId", r.json().get("planId") == "plan-e2e-1")
-
-    got = _wait_for_callback(1)
-    check("Callback was delivered to mock backend", got)
-    if not got:
-        return
-
-    cb = received[0]
-    check("Callback hit correct path", cb["path"] == "/internal/ai/decide/callback", cb["path"])
-    check("Callback carried X-Internal-Token", cb["token"] == TOKEN)
-    body = cb["body"] or {}
-    check("Callback body has camelCase planId", body.get("planId") == "plan-e2e-1")
-    decision = body.get("decision", {})
-    check("Decision shouldPost is False (rule path)", decision.get("shouldPost") is False,
-          str(decision.get("reasoning", ""))[:60])
-    check("Uses camelCase key 'shouldPost'", "shouldPost" in decision)
 
 
 def test_caption_roundtrip_with_groq(client: TestClient, media_type: str,
@@ -174,7 +147,12 @@ def test_caption_roundtrip_with_groq(client: TestClient, media_type: str,
     check(f"[{media_type}] top-level prompt present", bool(mr.get("prompt")))
     check(f"[{media_type}] scenes are English", bool(scenes) and all(s["prompt"].isascii() for s in scenes))
     check(f"[{media_type}] style present", bool(mr.get("style")))
+    if media_type == "short_video":
+        check(f"[{media_type}] master_prompt present", bool(mr.get("master_prompt")))
+    else:
+        check(f"[{media_type}] master_prompt is null (image)", mr.get("master_prompt") is None)
     print(f"\n  [{media_type}] style: {mr.get('style')}")
+    print(f"  [{media_type}] master_prompt: {mr.get('master_prompt')}")
     print(f"  [{media_type}] caption:\n  {caption}")
     print(f"  [{media_type}] scenes (English):")
     for i, s in enumerate(scenes, 1):
@@ -194,11 +172,9 @@ def main():
 
     try:
         with TestClient(app) as client:
-            print("== Auth ==")
+            print("== Auth (caption endpoint) ==")
             test_auth_rejects_bad_token(client)
             test_auth_rejects_missing_token(client)
-            print("\n== Decision round-trip (rule path, no Groq) ==")
-            test_decision_rule_path_roundtrip(client)
             if args.with_groq:
                 print("\n== Caption round-trip: IMAGE (real Groq) ==")
                 test_caption_roundtrip_with_groq(client, "image", "4:5", 1)
