@@ -34,5 +34,8 @@ export class UpdateServiceDto {
   @IsOptional() @IsString() @MaxLength(2000) description?: string;
   @IsOptional() @Type(() => Number) @IsInt() @Min(0) price?: number;
   @IsOptional() @IsString() @MaxLength(3) currency?: string;
-  @IsOptional() @IsBoolean() isActive?: boolean;
+  @IsOptional()
+  @Type(() => Boolean)
+  @IsBoolean()
+  isActive?: boolean;
 }

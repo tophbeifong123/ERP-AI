@@ -41,3 +41,4 @@ async function bootstrap() {
 }
 
 bootstrap();
+// trigger reload with ENABLE_AI_MEDIA=true

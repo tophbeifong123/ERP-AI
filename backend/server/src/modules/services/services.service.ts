@@ -75,6 +75,7 @@ export class ServicesService {
     if (opts.active !== undefined) where.isActive = opts.active;
     const [services, total] = await this.serviceRepo.findAndCount({
       where,
+      relations: { image: true },
       order: { createdAt: 'DESC' },
       skip: (opts.page - 1) * opts.limit,
       take: opts.limit,
@@ -85,6 +86,7 @@ export class ServicesService {
   async getOne(id: string): Promise<Service> {
     const service = await this.serviceRepo.findOne({
       where: { id, deletedAt: IsNull() },
+      relations: { image: true },
     });
     if (!service) {
       throw new NotFoundException({
@@ -95,14 +97,39 @@ export class ServicesService {
     return service;
   }
 
-  async update(id: string, dto: UpdateServiceDto): Promise<Service> {
+  async update(
+    id: string,
+    ownerId: string,
+    dto: UpdateServiceDto,
+    image?: Express.Multer.File,
+  ): Promise<Service> {
     const service = await this.getOne(id);
     if (dto.name !== undefined) service.name = dto.name;
-    if (dto.description !== undefined) service.description = dto.description;
+    if (dto.description !== undefined) service.description = dto.description ?? null;
     if (dto.price !== undefined) service.priceMinor = dto.price * 100;
     if (dto.currency !== undefined) service.currency = dto.currency;
     if (dto.isActive !== undefined) service.isActive = dto.isActive;
-    return this.serviceRepo.save(service);
+
+    if (image) {
+      if (service.imageFileId) {
+        try {
+          await this.filesService.deleteFile(service.imageFileId);
+        } catch {
+          // ignore deletion failure of orphan file
+        }
+      }
+      const saved = await this.filesService.uploadFile(
+        ownerId,
+        'service_image',
+        image.buffer,
+        image.mimetype,
+        image.originalname,
+      );
+      service.imageFileId = saved.id;
+    }
+
+    await this.serviceRepo.save(service);
+    return this.getOne(id);
   }
 
   async softDelete(id: string): Promise<void> {

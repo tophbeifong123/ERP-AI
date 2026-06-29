@@ -1,8 +1,34 @@
 # ERP-AI — Quick Start (Demo Flow)
 
-อัปเดตล่าสุด: มิถุนายน 2026 — ระบบหลักทำงานครบทุก flow แล้ว (register → onboard → create AI post → approve → cron posts to FB)
+อัปเดตล่าสุด: มิถุนายน 2026 — ระบบหลักทำงานครบทุก flow แล้ว (register → onboard → สร้างโพสต์ (เลือก image หรือ short_video) → อนุมัติ → cron โพสต์ไป Facebook)
 
 ## TL;DR
+
+### Option A — Windows native (frontend + backend on Windows, Docker for infra)
+
+Prerequisites: Windows 10/11, **Node.js 20+**, **pnpm 11+**, **Docker Desktop**.
+
+**One-time setup** (PowerShell, as Administrator the first time):
+```powershell
+cd D:\work\ERP-AI
+.\scripts\install-windows.ps1
+```
+
+**Daily run:**
+```powershell
+.\scripts\start-windows.ps1
+# opens 2 PowerShell windows (backend on :3000, frontend on :3001)
+# open http://localhost:3001 in your browser
+```
+
+**Stop:**
+```powershell
+.\scripts\stop-windows.ps1
+```
+
+Docker Desktop for Windows must be running — it provides Postgres on :5432, Redis on :6379, MinIO on :9000, n8n on :5678, ai-services on :8000, Mailhog on :8025. The backend (now on Windows) talks to them via `localhost` (Docker Desktop forwards container ports to the Windows host). n8n in Docker callbacks reach the backend via `APP_URL=http://host.docker.internal:3000` in `backend/server/.env`.
+
+### Option B — WSL (original setup, all 8 services in Docker)
 
 ```bash
 # 0. Prerequisites (one-time)

@@ -79,11 +79,16 @@ export class ServicesController {
   @Patch('services/:id')
   @UseGuards(OwnerGuard)
   @ResourceType('service')
+  @UseInterceptors(
+    FileInterceptor('image', { limits: { fileSize: 5 * 1024 * 1024 } }),
+  )
   async update(
     @Param('id', new ParseUUIDPipe()) id: string,
+    @CurrentUser('id') userId: string,
     @Body() dto: UpdateServiceDto,
+    @UploadedFile() image?: Express.Multer.File,
   ) {
-    const service = await this.servicesService.update(id, dto);
+    const service = await this.servicesService.update(id, userId, dto, image);
     return { service };
   }
 

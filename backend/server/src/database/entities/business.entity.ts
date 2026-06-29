@@ -15,6 +15,7 @@ import { File } from './file.entity';
 import { Service } from './service.entity';
 import { FacebookPage } from './facebook-page.entity';
 import { Post } from './post.entity';
+import { ContentPlan } from './content-plan.entity';
 
 @Entity('businesses')
 @Index(['ownerId'], { where: 'deleted_at IS NULL' })
@@ -71,4 +72,7 @@ export class Business {
 
   @OneToMany(() => Post, (post) => post.business)
   posts: Post[];
+
+  @OneToMany(() => ContentPlan, (plan) => plan.business)
+  contentPlans: ContentPlan[];
 }

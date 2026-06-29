@@ -26,6 +26,15 @@ import { Service } from '@/core/types/service';
 import { serviceService } from '@/core/services/service-service';
 import { PostMediaPreview } from '@/components/features/posts/post-media-preview';
 import { toast } from 'sonner';
+import {
+  Dialog,
+  DialogContent,
+  DialogHeader,
+  DialogTitle,
+  DialogDescription,
+  DialogFooter,
+} from '@/components/ui/dialog';
+import { Button } from '@/components/ui/button';
 
 type FilterStatus =
   | 'all'
@@ -74,19 +83,20 @@ export default function PostsPage() {
   const [editServiceIds, setEditServiceIds] = useState<string[]>([]);
   const [editLoading, setEditLoading] = useState(false);
   const [availableServices, setAvailableServices] = useState<Service[]>([]);
+  const [deletingPostId, setDeletingPostId] = useState<string | null>(null);
 
   const activeBusinessId = activeBusiness?.id;
 
-  const loadPosts = async () => {
+  const loadPosts = async (silent = false) => {
     if (!activeBusinessId) return;
-    setLoading(true);
+    if (!silent) setLoading(true);
     try {
       const data = await postService.getPosts({ businessId: activeBusinessId });
       setPosts(data);
     } catch {
-      toast.error('ไม่สามารถโหลดตารางแผนงานโพสต์ได้');
+      if (!silent) toast.error('ไม่สามารถโหลดตารางแผนงานโพสต์ได้');
     } finally {
-      setLoading(false);
+      if (!silent) setLoading(false);
     }
   };
 
@@ -100,27 +110,18 @@ export default function PostsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [activeBusinessId]);
 
-  // 3-second polling while any post is in 'generating'
-  const pollRef = useRef<ReturnType<typeof setInterval> | null>(null);
+  // Poll silently in the background every 3 seconds while any post is in 'generating' state
   useEffect(() => {
     const hasGenerating = posts.some((p) => p.status === 'generating');
-    if (hasGenerating && !pollRef.current) {
-      pollRef.current = setInterval(() => {
-        loadPosts();
-      }, 3000);
-    }
-    if (!hasGenerating && pollRef.current) {
-      clearInterval(pollRef.current);
-      pollRef.current = null;
-    }
-    return () => {
-      if (pollRef.current) {
-        clearInterval(pollRef.current);
-        pollRef.current = null;
-      }
-    };
+    if (!hasGenerating) return;
+
+    const timer = setTimeout(() => {
+      loadPosts(true); // Poll silently in the background
+    }, 3000);
+
+    return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [posts]);
+  }, [posts, activeBusinessId]);
 
   const handleApprove = async (id: string) => {
     setActionLoading(id);
@@ -152,9 +153,14 @@ export default function PostsPage() {
     }
   };
 
-  const handleDelete = async (id: string) => {
-    if (!confirm('คุณต้องการลบโพสต์รายการนี้ออกจากคิวใช่หรือไม่?'))
-      return;
+  const handleDeleteClick = (id: string) => {
+    setDeletingPostId(id);
+  };
+
+  const handleDeleteConfirm = async () => {
+    if (!deletingPostId) return;
+    const id = deletingPostId;
+    setDeletingPostId(null);
     setActionLoading(id);
     try {
       await postService.deletePost(id);
@@ -460,10 +466,10 @@ export default function PostsPage() {
                     </>
                   )}
 
-                  {post.status === 'failed' && (
+                  {['approved', 'failed', 'rejected', 'expired', 'generating', 'draft'].includes(post.status) && (
                     <button
                       type="button"
-                      onClick={() => handleDelete(post.id)}
+                      onClick={() => handleDeleteClick(post.id)}
                       disabled={actionLoading !== null}
                       className="p-2 rounded-lg bg-secondary hover:bg-red-500/10 border border-border hover:border-red-500/20 text-muted-foreground hover:text-red-500 transition cursor-pointer disabled:opacity-50 flex items-center gap-1 text-xs font-semibold"
                     >
@@ -616,6 +622,36 @@ export default function PostsPage() {
           </div>
         </div>
       )}
+
+      {/* Delete Confirmation Dialog */}
+      <Dialog open={!!deletingPostId} onOpenChange={(open) => !open && setDeletingPostId(null)}>
+        <DialogContent className="max-w-md w-full bg-white rounded-2xl p-6 shadow-2xl border border-neutral-100 animate-scale-up space-y-4">
+          <DialogHeader className="space-y-2">
+            <DialogTitle className="text-lg font-bold text-neutral-900">
+              ยืนยันการลบโพสต์
+            </DialogTitle>
+            <DialogDescription className="text-xs text-neutral-500 leading-relaxed">
+              คุณแน่ใจหรือไม่ว่าต้องการลบโพสต์รายการนี้ออกจากคิวงาน? หากลบโพสต์ที่อนุมัติแล้ว ระบบจะถอนโพสต์ออกจากตารางการเผยแพร่บน Facebook โดยอัตโนมัติ และการดำเนินการนี้จะไม่สามารถกู้คืนได้
+            </DialogDescription>
+          </DialogHeader>
+          <DialogFooter className="flex justify-end gap-2 pt-2">
+            <Button
+              variant="outline"
+              onClick={() => setDeletingPostId(null)}
+              className="cursor-pointer border-neutral-200 bg-white hover:bg-neutral-50 text-neutral-700"
+            >
+              ยกเลิก
+            </Button>
+            <Button
+              variant="destructive"
+              onClick={handleDeleteConfirm}
+              className="bg-red-500 hover:bg-red-600 text-white border-transparent cursor-pointer"
+            >
+              ยืนยันการลบ
+            </Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
     </div>
   );
 }

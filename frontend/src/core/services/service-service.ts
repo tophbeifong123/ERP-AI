@@ -60,6 +60,23 @@ export const serviceService = {
     data: Partial<CreateServiceData> & { isActive?: boolean },
     imageFile?: File
   ): Promise<Service> {
+    if (!imageFile) {
+      // Send as JSON for standard field updates (best practice, matches NestJS PATCH DTO)
+      const payload: Record<string, any> = {};
+      if (data.name !== undefined) payload.name = data.name;
+      if (data.description !== undefined) payload.description = data.description;
+      if (data.price !== undefined) {
+        payload.price = Math.round(Number(data.price) * 100);
+      }
+      if (data.isActive !== undefined) payload.isActive = data.isActive;
+
+      const response = await apiClient.patch<{ service: Service }>(
+        `/services/${serviceId}`,
+        payload
+      );
+      return response.data.service;
+    }
+
     const formData = new FormData();
     if (data.name) formData.append('name', data.name);
     if (data.description !== undefined) formData.append('description', data.description || '');
@@ -70,9 +87,7 @@ export const serviceService = {
     if (data.isActive !== undefined) {
       formData.append('isActive', data.isActive ? 'true' : 'false');
     }
-    if (imageFile) {
-      formData.append('image', imageFile);
-    }
+    formData.append('image', imageFile);
 
     const response = await apiClient.patch<{ service: Service }>(
       `/services/${serviceId}`,

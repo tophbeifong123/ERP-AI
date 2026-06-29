@@ -16,6 +16,7 @@ import {
   Loader2,
   Check,
   Settings,
+  TrendingUp,
 } from "lucide-react";
 import { toast } from "sonner";
 
@@ -138,6 +139,7 @@ export default function DashboardLayout({ children }: DashboardLayoutProps) {
   const menuItems = [
     { name: "แดชบอร์ดหลัก", href: "/dashboard", icon: LayoutDashboard },
     { name: "ห้องทำงาน AI โพสต์", href: "/posts", icon: ImageIcon },
+    { name: "วิเคราะห์การตลาด", href: "/insights", icon: TrendingUp },
     { name: "จัดการสินค้า/บริการ", href: "/services", icon: ShoppingBag },
   ];
 

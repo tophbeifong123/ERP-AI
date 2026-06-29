@@ -16,6 +16,18 @@ export interface MediaJobData {
   jobId: string;
 }
 
+// AI-optimised media request handed over by the caption callback (stored on the
+// media job's payload). Contents are the AI Media (n8n) snake_case format.
+interface OptimizedMediaRequest {
+  content_type?: string;
+  aspect_ratio?: string;
+  style?: string;
+  negative_prompt?: string;
+  prompt?: string;
+  master_prompt?: string | null;
+  scenes?: { prompt: string }[];
+}
+
 const PRESIGNED_EXPIRES_SEC = 600; // 10 min (covers Veo ~3 min + buffers)
 
 @Processor('media')
@@ -62,6 +74,12 @@ export class MediaProcessor extends WorkerHost {
     const mime = isVideo ? 'video/mp4' : 'image/png';
     const maxBytes = isVideo ? 52_428_800 : 10_485_760;
 
+    // AI-optimised media request (scenes/master_prompt/style), if the caption
+    // step produced one. Falls back to the raw hint when absent.
+    const mediaRequest = aiJob.payload?.mediaRequest as
+      | OptimizedMediaRequest
+      | undefined;
+
     // 1) Reserve a presigned URL so n8n can upload directly to MinIO.
     const presigned = await this.s3Service.generatePresignedUploadUrl(
       'posts/media',
@@ -89,6 +107,10 @@ export class MediaProcessor extends WorkerHost {
           : null,
       })),
     );
+
+    const referenceImageUrls = featuredServices
+      .map((s) => s.imagePublicUrl)
+      .filter((url): url is string => typeof url === 'string' && url.length > 0);
 
     // 3) Compose payload for n8n webhook (matches docs/contracts/AI-MEDIA.md)
     const aiMediaUrl = this.configService.get<string>('app.ai.mediaUrl');
@@ -119,13 +141,31 @@ export class MediaProcessor extends WorkerHost {
         keywords: business.keywords ?? [],
         logoPublicUrl,
       },
+      prompt:
+        mediaRequest?.prompt ??
+        (aiJob.payload?.hint as string | undefined) ??
+        (aiJob.payload?.captionHint as string | undefined) ??
+        post.caption ??
+        '',
       hint:
         (aiJob.payload?.hint as string | undefined) ??
         (aiJob.payload?.captionHint as string | undefined) ??
         null,
       caption: post.caption ?? '',
+      // AI-optimised media fields (scenes for video, master_prompt overview,
+      // style, aspect ratio). n8n falls back to `prompt`/`hint` if absent.
+      ...(mediaRequest
+        ? {
+            content_type: mediaRequest.content_type,
+            aspect_ratio: mediaRequest.aspect_ratio,
+            style: mediaRequest.style,
+            negative_prompt: mediaRequest.negative_prompt,
+            master_prompt: mediaRequest.master_prompt ?? null,
+            scenes: mediaRequest.scenes ?? [],
+          }
+        : {}),
       featuredServices,
-      referenceImageUrls: [],
+      referenceImageUrls,
     };
 
     // 4) Persist a snapshot for debugging / replay

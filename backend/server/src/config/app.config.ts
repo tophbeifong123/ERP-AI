@@ -4,7 +4,16 @@ export default registerAs('app', () => ({
   port: parseInt(process.env.PORT || '3000', 10),
   nodeEnv: process.env.NODE_ENV || 'development',
   logLevel: process.env.LOG_LEVEL || 'info',
-  appUrl: process.env.APP_URL || 'http://localhost:3000',
+  appUrl: (() => {
+    let url = process.env.APP_URL || 'http://localhost:3000';
+    if (process.platform === 'win32' && url.includes('host.docker.internal')) {
+      const computerName = process.env.COMPUTERNAME;
+      if (computerName) {
+        url = url.replace('host.docker.internal', computerName.toLowerCase());
+      }
+    }
+    return url;
+  })(),
   frontendUrl: process.env.FRONTEND_URL || 'http://localhost:3001',
   jwt: {
     accessSecret: process.env.JWT_ACCESS_SECRET || 'dev-access-secret',
