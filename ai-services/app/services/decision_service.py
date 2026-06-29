@@ -1,141 +1,135 @@
+"""AI Decision (time recommender) service.
+
+Given a draft post + business context, ask the LLM to recommend the best
+time to publish. Falls back to a sensible default (now + 2 hours) if the
+LLM call fails.
+"""
 import json
-from datetime import datetime, timezone
+import logging
+from datetime import datetime, timedelta, timezone
 
 from groq import Groq
 
 from app.core.config import settings
 from app.core.security import post_callback
 from app.schemas.decision import (
-    DecisionRequest,
-    Decision,
     DecisionCallback,
     DecisionErrorCallback,
+    DecisionRequest,
+    DecisionResult,
     ErrorInfo,
 )
+
+logger = logging.getLogger(__name__)
 
 client = Groq(api_key=settings.GROQ_API_KEY)
 MODEL = "llama-3.3-70b-versatile"
 
 
 def _build_prompt(req: DecisionRequest, now: datetime) -> str:
-    if req.services:
-        services_text = "\n".join(
-            f"  - id: {s.id} | {s.name} | {s.description or 'N/A'}"
-            + (f" | {s.price_minor / 100:.0f} {s.currency or 'THB'}" if s.price_minor else "")
-            + (" | INACTIVE" if not s.is_active else "")
-            for s in req.services
+    services_text = (
+        "\n".join(
+            f"  - {s.name}" + (f" ({s.description})" if s.description else "")
+            for s in req.featured_services
         )
-    else:
-        services_text = "  No services provided"
-
-    recently_featured = (
-        ", ".join(req.recent_featured_service_ids)
-        if req.recent_featured_service_ids else "none"
+        if req.featured_services
+        else "  No services featured"
     )
 
-    recent_text = "\n".join(
-        f"  - {p.posted_at.strftime('%Y-%m-%d')} ({p.post_type})" for p in req.recent_posts
-    ) or "  No recent posts"
+    target = req.business.target_audience or "general Thai audience"
 
-    last_post = req.last_post_at
-    days_since = (now - last_post).days if last_post else None
-    days_since_text = f"{days_since} days ago" if days_since is not None else "No posts yet"
+    return f"""You are a Thai SME social-media strategist. Recommend the best
+publishing time for a Facebook post.
 
-    return f"""You are an AI marketing strategist for Thai SME businesses.
-Decide whether the business should post on Facebook today.
-
-## Business Info
+## Business
 - Name: {req.business.name}
 - Industry: {req.business.industry or 'N/A'}
-- Description: {req.business.description or 'N/A'}
 - Tone: {req.business.tone or 'friendly'}
-- Target Audience: {req.business.target_audience or 'general'}
-- Keywords: {', '.join(req.business.keywords) if req.business.keywords else 'N/A'}
+- Target audience: {target}
 
-## Services/Products (choose featured ids ONLY from this list)
+## Post
+- Type: {req.post_type or 'promotion'}
+- Hint: {req.caption_hint or 'N/A'}
+- Featured services:
 {services_text}
 
-## Posting Rules
-- Target: {req.business.posts_per_week_target} posts per week
-- Minimum gap between posts: {req.business.min_gap_days} days
-- Posts this week so far: {req.posts_this_week}
-- Last post: {days_since_text}
-- Recent posts:
-{recent_text}
-- Current date/time: {now.strftime('%Y-%m-%d %H:%M')} UTC
+## Current time (UTC)
+{now.strftime('%Y-%m-%d %H:%M')}
 
-## Your Task
-Decide if the business should post today. Pick 1-3 featured services that are
-active, match the post type, and were NOT recently featured.
-Recently featured service ids (avoid these): {recently_featured}
+## Task
+Pick a single best publish time within the next 24 hours, in UTC, that is
+likely to maximize engagement for the target audience on Facebook.
+Thai working-age audiences are most active around 12:00 and 19:00 local
+(UTC+7) → 05:00 and 12:00 UTC.
 
-Respond in this exact JSON format (no other text):
+Respond in EXACTLY this JSON format, no other text:
 {{
-  "should_post": true or false,
-  "reasoning": "Brief explanation",
-  "suggested_scheduled_at": "YYYY-MM-DDTHH:MM:SSZ" or null,
-  "post_type": "promotion" or "product_showcase" or "brand_awareness" or "event" or null,
-  "featured_service_ids": ["id1"] or [],
-  "caption_hint": "Brief hint for caption generation" or null
+  "suggested_scheduled_at": "YYYY-MM-DDTHH:MM:SSZ",
+  "reasoning": "1 short sentence"
 }}"""
 
 
-def build_decision(req: DecisionRequest) -> Decision:
-    """Core logic: rule guardrails first, then the AI. Returns a Decision."""
+def _fallback_time(now: datetime) -> datetime:
+    """If LLM fails, schedule 2 hours from now (rounded to next 30 min)."""
+    candidate = now + timedelta(hours=2)
+    discard = timedelta(
+        minutes=candidate.minute % 30,
+        seconds=candidate.second,
+        microseconds=candidate.microsecond,
+    )
+    return candidate - discard
+
+
+def build_decision(req: DecisionRequest) -> DecisionResult:
+    """Call the LLM to recommend a publish time. Falls back gracefully on errors."""
     now = req.now_iso or datetime.now(timezone.utc)
-
-    if req.posts_this_week >= req.business.posts_per_week_target:
-        return Decision(
-            should_post=False,
-            reasoning=f"Weekly target of {req.business.posts_per_week_target} posts already reached ({req.posts_this_week} this week)",
+    try:
+        prompt = _build_prompt(req, now)
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {
+                    "role": "system",
+                    "content": "You are a marketing AI. Respond only with valid JSON.",
+                },
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.5,
+            max_tokens=200,
         )
-
-    if req.last_post_at:
-        days_since = (now - req.last_post_at).days
-        if days_since < req.business.min_gap_days:
-            return Decision(
-                should_post=False,
-                reasoning=f"Last post was {days_since} day(s) ago, minimum gap is {req.business.min_gap_days} day(s)",
-            )
-
-    prompt = _build_prompt(req, now)
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {"role": "system", "content": "You are a marketing AI. Respond only with valid JSON."},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.7,
-        max_tokens=500,
-    )
-
-    raw = response.choices[0].message.content.strip()
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-    data = json.loads(raw)
-
-    scheduled_at = None
-    if data.get("suggested_scheduled_at"):
-        scheduled_at = datetime.fromisoformat(data["suggested_scheduled_at"].replace("Z", "+00:00"))
-
-    return Decision(
-        should_post=data["should_post"],
-        reasoning=data["reasoning"],
-        suggested_scheduled_at=scheduled_at,
-        post_type=data.get("post_type"),
-        featured_service_ids=data.get("featured_service_ids", []),
-        caption_hint=data.get("caption_hint"),
-    )
+        raw = response.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        data = json.loads(raw)
+        ts = data.get("suggested_scheduled_at")
+        if not ts:
+            raise ValueError("LLM did not return suggested_scheduled_at")
+        scheduled = datetime.fromisoformat(ts.replace("Z", "+00:00"))
+        if scheduled < now:
+            scheduled = _fallback_time(now)
+        return DecisionResult(
+            suggested_scheduled_at=scheduled,
+            reasoning=data.get("reasoning"),
+        )
+    except Exception as e:
+        logger.warning(f"Decision LLM call failed, using fallback: {e}")
+        return DecisionResult(
+            suggested_scheduled_at=_fallback_time(now),
+            reasoning=f"Fallback time (LLM error: {type(e).__name__})",
+        )
 
 
 def process_decision(req: DecisionRequest) -> None:
-    """Background task: run the decision and POST the result to callbackUrl."""
+    """Background task: run the recommender and POST the result to callbackUrl."""
     try:
-        decision = build_decision(req)
-        payload = DecisionCallback(plan_id=req.plan_id, decision=decision)
+        result = build_decision(req)
+        payload = DecisionCallback(job_id=req.job_id, result=result)
     except Exception as e:
+        logger.exception("Decision processing failed")
         payload = DecisionErrorCallback(
-            plan_id=req.plan_id,
+            job_id=req.job_id,
             error=ErrorInfo(code="internal_error", message=str(e)),
         )
-    post_callback(req.callback_url, payload.model_dump(by_alias=True, mode="json"))
+    post_callback(
+        req.callback_url, payload.model_dump(by_alias=True, mode="json")
+    )

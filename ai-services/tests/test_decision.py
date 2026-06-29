@@ -1,15 +1,14 @@
-"""Tests for the AI Decision service (async-callback contract).
+"""Tests for the AI Time Recommender (decision) service.
 
-Rule guardrails return early WITHOUT calling Groq. The AI path and the
-callback delivery are tested with mocks, so no real API/network calls happen.
+The LLM is mocked, so no real network calls happen. The fallback path is
+also tested by making the LLM raise.
 """
 import json
-from datetime import datetime, timedelta, timezone
+from datetime import datetime, timezone
 
 from app.schemas.decision import (
-    DecisionRequest,
     BusinessContext,
-    RecentPost,
+    DecisionRequest,
     ServiceInfo,
 )
 from app.services import decision_service
@@ -17,16 +16,18 @@ from app.services import decision_service
 
 def _request(**overrides) -> DecisionRequest:
     data = dict(
-        callback_url="https://api.example.com/internal/ai/decide/callback",
-        plan_id="plan-123",
+        callback_url="https://api.example.com/internal/ai/decision/callback",
+        job_id="job-123",
+        post_id="post-1",
         business=BusinessContext(
-            id="b1", name="Test Shop", posts_per_week_target=3, min_gap_days=1
+            id="b1", name="Test Shop", industry="ร้านกาแฟ", tone="friendly"
         ),
-        recent_posts=[],
-        posts_this_week=0,
-        last_post_at=None,
+        post_type="promotion",
+        featured_services=[
+            ServiceInfo(id="svc-1", name="Latte", price_minor=6500, currency="THB")
+        ],
+        caption_hint="โปรโมชั่นลดราคา",
         now_iso=datetime(2026, 6, 28, 10, 0, tzinfo=timezone.utc),
-        services=[ServiceInfo(id="svc-1", name="Latte", price_minor=6500, currency="THB")],
     )
     data.update(overrides)
     return DecisionRequest(**data)
@@ -49,54 +50,62 @@ def _fake_groq(fake_json: str):
 
 
 def test_request_accepts_camelcase_input():
-    """Backend sends camelCase; the schema must parse it."""
     req = DecisionRequest.model_validate({
         "callbackUrl": "https://x/cb",
-        "planId": "p1",
-        "business": {"id": "b1", "name": "Shop", "postsPerWeekTarget": 2, "minGapDays": 1},
-        "recentPosts": [{"postedAt": "2026-06-22T11:30:00Z", "postType": "promotion"}],
-        "postsThisWeek": 1,
+        "jobId": "j1",
+        "postId": "p1",
+        "business": {"id": "b1", "name": "Shop"},
+        "postType": "promotion",
+        "featuredServices": [
+            {"id": "s1", "name": "Coffee", "priceMinor": 6500, "currency": "THB"}
+        ],
+        "captionHint": "โปรฯ",
         "nowIso": "2026-06-28T06:00:00Z",
-        "services": [],
     })
-    assert req.business.posts_per_week_target == 2
-    assert req.recent_posts[0].post_type == "promotion"
+    assert req.job_id == "j1"
+    assert req.featured_services[0].price_minor == 6500
 
 
-def test_blocks_when_weekly_target_reached():
-    d = decision_service.build_decision(_request(posts_this_week=3))
-    assert d.should_post is False
-    assert "target" in d.reasoning.lower()
-
-
-def test_blocks_when_last_post_too_recent():
-    now = datetime(2026, 6, 28, 10, 0, tzinfo=timezone.utc)
-    d = decision_service.build_decision(_request(
-        last_post_at=now - timedelta(hours=5), posts_this_week=1, now_iso=now,
-    ))
-    assert d.should_post is False
-    assert "gap" in d.reasoning.lower()
-
-
-def test_ai_path_returns_decision(monkeypatch):
+def test_ai_path_returns_time_recommendation(monkeypatch):
     fake = json.dumps({
-        "should_post": True,
-        "reasoning": "Good day to post",
         "suggested_scheduled_at": "2026-06-28T18:00:00Z",
-        "post_type": "promotion",
-        "featured_service_ids": ["svc-1"],
-        "caption_hint": "เน้นโปร",
+        "reasoning": "Peak engagement window for Thai working audience",
     })
-    monkeypatch.setattr(decision_service.client.chat.completions, "create", _fake_groq(fake))
+    monkeypatch.setattr(
+        decision_service.client.chat.completions, "create", _fake_groq(fake)
+    )
 
-    d = decision_service.build_decision(_request())
-    assert d.should_post is True
-    assert d.post_type == "promotion"
-    assert d.featured_service_ids == ["svc-1"]
+    result = decision_service.build_decision(_request())
+    assert result.suggested_scheduled_at == datetime(
+        2026, 6, 28, 18, 0, tzinfo=timezone.utc
+    )
+    assert "engagement" in (result.reasoning or "").lower()
+
+
+def test_falls_back_when_llm_returns_invalid(monkeypatch):
+    bad = json.dumps({"reasoning": "I forgot the timestamp"})
+    monkeypatch.setattr(
+        decision_service.client.chat.completions, "create", _fake_groq(bad)
+    )
+
+    now = datetime(2026, 6, 28, 10, 0, tzinfo=timezone.utc)
+    result = decision_service.build_decision(_request(now_iso=now))
+    assert result.suggested_scheduled_at >= now
+
+
+def test_falls_back_when_llm_raises(monkeypatch):
+    def boom(*args, **kwargs):
+        raise RuntimeError("groq exploded")
+
+    monkeypatch.setattr(decision_service.client.chat.completions, "create", boom)
+
+    now = datetime(2026, 6, 28, 10, 0, tzinfo=timezone.utc)
+    result = decision_service.build_decision(_request(now_iso=now))
+    assert result.suggested_scheduled_at >= now
+    assert "Fallback" in (result.reasoning or "")
 
 
 def test_process_decision_posts_camelcase_callback(monkeypatch):
-    """process_decision must POST a camelCase {planId, decision:{...}} payload."""
     captured = {}
 
     def fake_post(url, payload):
@@ -104,26 +113,39 @@ def test_process_decision_posts_camelcase_callback(monkeypatch):
         captured["payload"] = payload
 
     monkeypatch.setattr(decision_service, "post_callback", fake_post)
+    monkeypatch.setattr(
+        decision_service.client.chat.completions,
+        "create",
+        _fake_groq(
+            json.dumps({
+                "suggested_scheduled_at": "2026-06-28T18:00:00Z",
+                "reasoning": "ok",
+            })
+        ),
+    )
 
-    decision_service.process_decision(_request(posts_this_week=3))  # rule path, no Groq
+    decision_service.process_decision(_request())
 
-    assert captured["url"].endswith("/decide/callback")
-    assert captured["payload"]["planId"] == "plan-123"
-    assert captured["payload"]["decision"]["shouldPost"] is False
+    assert captured["url"].endswith("/decision/callback")
+    assert captured["payload"]["jobId"] == "job-123"
+    assert "suggestedScheduledAt" in captured["payload"]["result"]
 
 
 def test_process_decision_sends_error_callback_on_failure(monkeypatch):
-    """If the AI path throws, an error callback is sent (not a crash)."""
     captured = {}
-    monkeypatch.setattr(decision_service, "post_callback",
-                        lambda url, payload: captured.update(payload=payload))
+    monkeypatch.setattr(
+        decision_service,
+        "post_callback",
+        lambda url, payload: captured.update(payload=payload),
+    )
 
-    def boom(*args, **kwargs):
-        raise RuntimeError("groq exploded")
+    # Make build_decision itself raise (e.g. unexpected error path)
+    def boom(req):
+        raise RuntimeError("everything exploded")
 
-    monkeypatch.setattr(decision_service.client.chat.completions, "create", boom)
+    monkeypatch.setattr(decision_service, "build_decision", boom)
 
-    decision_service.process_decision(_request(posts_this_week=0))  # AI path
+    decision_service.process_decision(_request())
 
-    assert captured["payload"]["planId"] == "plan-123"
+    assert captured["payload"]["jobId"] == "job-123"
     assert captured["payload"]["error"]["code"] == "internal_error"

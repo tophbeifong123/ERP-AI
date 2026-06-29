@@ -119,15 +119,23 @@ export class MediaProcessor extends WorkerHost {
         keywords: business.keywords ?? [],
         logoPublicUrl,
       },
+      hint:
+        (aiJob.payload?.hint as string | undefined) ??
+        (aiJob.payload?.captionHint as string | undefined) ??
+        null,
       caption: post.caption ?? '',
       featuredServices,
       referenceImageUrls: [],
     };
 
     // 4) Persist a snapshot for debugging / replay
-    aiJob.status = 'queued';
+    aiJob.status = 'running';
     aiJob.attempts += 1;
-    aiJob.payload = { ...(aiJob.payload || {}), upload: payload.upload, callbackUrl };
+    aiJob.payload = {
+      ...(aiJob.payload || {}),
+      upload: payload.upload,
+      callbackUrl,
+    };
     aiJob.lastError = null;
     await this.jobRepo.save(aiJob);
 

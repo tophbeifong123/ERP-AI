@@ -13,6 +13,7 @@ import { FacebookPage } from '../../database/entities/facebook-page.entity';
 import { RefreshToken } from '../../database/entities/refresh-token.entity';
 import { CaptionProcessor } from './caption.processor';
 import { MediaProcessor } from './media.processor';
+import { DecisionProcessor } from './decision.processor';
 import { DispatchPostProcessor } from './dispatch-post.processor';
 import { RefreshTokenProcessor } from './refresh-token.processor';
 import { CommonModule } from '../../common/common.module';
@@ -32,6 +33,7 @@ const queueFactory = (config: ConfigService) => ({
     AuthConfigModule,
     CommonModule,
     FilesModule,
+    PostsModule,
     TypeOrmModule.forFeature([
       AiJob,
       Post,
@@ -44,22 +46,50 @@ const queueFactory = (config: ConfigService) => ({
       RefreshToken,
     ]),
     BullModule.registerQueueAsync(
-      { name: 'caption', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
+      {
+        name: 'caption',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: queueFactory,
+      },
     ),
     BullModule.registerQueueAsync(
-      { name: 'media', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
+      {
+        name: 'media',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: queueFactory,
+      },
     ),
     BullModule.registerQueueAsync(
-      { name: 'dispatch-post', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
+      {
+        name: 'decision',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: queueFactory,
+      },
     ),
     BullModule.registerQueueAsync(
-      { name: 'refresh-token-cleanup', imports: [ConfigModule], inject: [ConfigService], useFactory: queueFactory },
+      {
+        name: 'dispatch-post',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: queueFactory,
+      },
     ),
-    PostsModule,
+    BullModule.registerQueueAsync(
+      {
+        name: 'refresh-token-cleanup',
+        imports: [ConfigModule],
+        inject: [ConfigService],
+        useFactory: queueFactory,
+      },
+    ),
   ],
   providers: [
     CaptionProcessor,
     MediaProcessor,
+    DecisionProcessor,
     DispatchPostProcessor,
     RefreshTokenProcessor,
   ],

@@ -21,7 +21,6 @@ import { FacebookModule } from './modules/facebook/facebook.module';
 import { EmailModule } from './modules/email/email.module';
 import { AiModule } from './modules/ai/ai.module';
 import { PostsModule } from './modules/posts/posts.module';
-import { ContentPlansModule } from './modules/content-plans/content-plans.module';
 import { AiJobsModule } from './modules/ai-jobs/ai-jobs.module';
 import { NotificationsModule } from './modules/notifications/notifications.module';
 import { SchedulerModule } from './modules/scheduler/scheduler.module';
@@ -72,7 +71,6 @@ import { CommonModule } from './common/common.module';
     HealthModule,
     AiModule,
     PostsModule,
-    ContentPlansModule,
     AiJobsModule,
     NotificationsModule,
     SchedulerModule,

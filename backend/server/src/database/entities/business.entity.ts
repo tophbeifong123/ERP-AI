@@ -14,15 +14,7 @@ import { User } from './user.entity';
 import { File } from './file.entity';
 import { Service } from './service.entity';
 import { FacebookPage } from './facebook-page.entity';
-import { ContentPlan } from './content-plan.entity';
 import { Post } from './post.entity';
-
-export type AutoPostMode = 'ai_decide' | 'fixed_schedule';
-
-export interface FixedScheduleRule {
-  dayOfWeek: number;
-  time: string;
-}
 
 @Entity('businesses')
 @Index(['ownerId'], { where: 'deleted_at IS NULL' })
@@ -51,21 +43,6 @@ export class Business {
   @Column({ type: 'text', array: true, default: '{}' })
   keywords: string[];
 
-  @Column({ name: 'auto_post_enabled', type: 'boolean', default: false })
-  autoPostEnabled: boolean;
-
-  @Column({ name: 'auto_post_mode', type: 'text', nullable: true })
-  autoPostMode: AutoPostMode | null;
-
-  @Column({ name: 'posts_per_week_target', type: 'smallint', default: 3 })
-  postsPerWeekTarget: number;
-
-  @Column({ name: 'min_gap_days', type: 'smallint', default: 1 })
-  minGapDays: number;
-
-  @Column({ name: 'fixed_schedule_rules', type: 'jsonb', default: [] })
-  fixedScheduleRules: FixedScheduleRule[];
-
   @Column({ name: 'logo_file_id', type: 'uuid', nullable: true })
   logoFileId: string | null;
 
@@ -91,9 +68,6 @@ export class Business {
 
   @OneToMany(() => FacebookPage, (page) => page.business)
   facebookPages: FacebookPage[];
-
-  @OneToMany(() => ContentPlan, (plan) => plan.business)
-  contentPlans: ContentPlan[];
 
   @OneToMany(() => Post, (post) => post.business)
   posts: Post[];

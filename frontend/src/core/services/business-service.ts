@@ -1,7 +1,6 @@
 // src/core/services/business-service.ts
 import apiClient from './api-client';
 import { Business } from '../types/business';
-import { AutoPostConfigInput } from '../validations/business-schema';
 
 export interface CreateBusinessData {
   name: string;
@@ -56,17 +55,6 @@ export const businessService = {
    */
   async getBusiness(id: string): Promise<Business> {
     const response = await apiClient.get<{ business: Business }>(`/businesses/${id}`);
-    return response.data.business;
-  },
-
-  /**
-   * อัปเดตการตั้งค่าการโพสต์อัตโนมัติ (Step 2)
-   */
-  async updateAutoPostConfig(id: string, config: AutoPostConfigInput): Promise<Business> {
-    const response = await apiClient.patch<{ business: Business }>(
-      `/businesses/${id}/auto-post`,
-      config
-    );
     return response.data.business;
   },
 

@@ -52,7 +52,18 @@ export class DispatchPostProcessor extends WorkerHost {
       return { fbPostId: '', endpoint: 'skipped' };
     }
     if (!post.fbPageId) {
-      throw new Error(`Post ${postId} has no fbPageId`);
+      const msg =
+        'No Facebook page connected to this business. Please connect a page in Settings before scheduling a post.';
+      this.logger.error(`Dispatch post ${postId} aborted: ${msg}`);
+      post.status = 'failed';
+      post.errorCode = 'E_NO_FB_PAGE';
+      post.errorMessage = msg;
+      await this.postRepo.save(post);
+      await this.postEvents.emitForStatus(post.id, 'failed', {
+        errorCode: 'E_NO_FB_PAGE',
+        errorMessage: msg,
+      });
+      throw new Error(msg);
     }
 
     const page = await this.pageRepo.findOne({

@@ -2,25 +2,31 @@
 'use client';
 
 import React, { useEffect, useState } from 'react';
-import { 
-  Building, 
-  TrendingUp, 
-  ThumbsUp, 
-  MessageSquare, 
-  Plus, 
+import {
+  Building,
+  TrendingUp,
+  ThumbsUp,
+  MessageSquare,
+  Plus,
   ArrowUpRight,
   Settings,
   Check,
   X,
   Loader2,
   Calendar,
-  Globe
+  Globe,
+  Sparkles,
+  Video,
 } from 'lucide-react';
 import { useRouter } from 'next/navigation';
 import { useBusinessStore } from '@/hooks/store/use-business-store';
 import { postService } from '@/core/services/post-service';
-import { Post } from '@/core/types/post';
+import { Post, PostMediaType } from '@/core/types/post';
 import { toast } from 'sonner';
+import CreatePostModal from '@/components/features/posts/create-post-modal';
+import { PostMediaPreview } from '@/components/features/posts/post-media-preview';
+import { Service } from '@/core/types/service';
+import { serviceService } from '@/core/services/service-service';
 
 export default function DashboardPage() {
   const router = useRouter();
@@ -28,6 +34,8 @@ export default function DashboardPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(false);
   const [actionLoading, setActionLoading] = useState<string | null>(null);
+  const [showCreateModal, setShowCreateModal] = useState(false);
+  const [services, setServices] = useState<Service[]>([]);
 
   const activeBusinessId = activeBusiness?.id;
 
@@ -118,9 +126,24 @@ export default function DashboardPage() {
             <Settings className="w-4 h-4 text-muted-foreground" />
             ตั้งค่าธุรกิจ
           </button>
-          <button className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-xs font-bold text-white shadow shadow-primary/20 transition cursor-pointer">
+          <button
+            type="button"
+            onClick={() => {
+              if (!activeBusinessId) {
+                toast.error('กรุณาเลือกธุรกิจก่อนสร้างโพสต์');
+                return;
+              }
+              if (activeBusiness?.facebookPages?.length === 0) {
+                toast.error('กรุณาเชื่อมต่อ Facebook Page ก่อนสร้างโพสต์');
+                router.push('/settings?tab=facebook');
+                return;
+              }
+              setShowCreateModal(true);
+            }}
+            className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-primary hover:bg-primary/90 text-xs font-bold text-white shadow shadow-primary/20 transition cursor-pointer"
+          >
             <Plus className="w-4 h-4" />
-            สร้างโพสต์ด่วน (AI)
+            สร้างโพสต์ด้วย AI
           </button>
         </div>
       </div>
@@ -180,15 +203,20 @@ export default function DashboardPage() {
                   ? new Date(post.scheduledAt).toLocaleString('th-TH', { dateStyle: 'short', timeStyle: 'short' })
                   : 'ไม่ได้กำหนดเวลา';
                 const hasMedia = post.media && post.media.length > 0;
-                const mediaUrl = hasMedia ? post.media![0].file.publicUrl : null;
+                const firstMedia = hasMedia ? post.media![0] : undefined;
 
                 return (
                   <div key={post.id} className="p-4 rounded-xl border border-border bg-background/50 flex flex-col md:flex-row md:items-center justify-between gap-4 transition hover:border-white/15">
                     <div className="flex items-start gap-4 flex-1">
                       {/* Post Media Preview */}
                       <div className="w-14 h-14 rounded-lg border border-border bg-muted shrink-0 overflow-hidden flex items-center justify-center">
-                        {mediaUrl ? (
-                          <img src={mediaUrl} alt="Post preview" className="w-full h-full object-cover" />
+                        {firstMedia ? (
+                          <PostMediaPreview
+                            media={firstMedia}
+                            className="w-full h-full object-cover"
+                          />
+                        ) : post.status === 'generating' ? (
+                          <DashboardGeneratingPlaceholder mediaType={post.mediaType} />
                         ) : (
                           <Building className="w-6 h-6 text-muted-foreground" />
                         )}
@@ -322,6 +350,40 @@ export default function DashboardPage() {
         </div>
 
       </div>
+
+      {activeBusinessId && (
+        <CreatePostModal
+          open={showCreateModal}
+          onClose={() => setShowCreateModal(false)}
+          onCreated={() => {
+            setShowCreateModal(false);
+            router.push('/posts');
+          }}
+          businessId={activeBusinessId}
+          services={services}
+          onLoadServices={async () => {
+            const data = await serviceService.getServices(activeBusinessId);
+            setServices(data);
+            return data;
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+function DashboardGeneratingPlaceholder({ mediaType }: { mediaType?: PostMediaType }) {
+  const isVideo = mediaType === 'short_video';
+  return (
+    <div className="w-full h-full flex flex-col items-center justify-center gap-0.5 bg-gradient-to-br from-indigo-50 to-purple-50">
+      {isVideo ? (
+        <Video className="w-5 h-5 text-indigo-400 animate-pulse" />
+      ) : (
+        <Sparkles className="w-5 h-5 text-indigo-400 animate-pulse" />
+      )}
+      <span className="text-[9px] text-indigo-600 font-medium">
+        {isVideo ? 'กำลังสร้างวิดีโอ…' : 'กำลังสร้างรูปภาพ…'}
+      </span>
     </div>
   );
 }

@@ -4,21 +4,28 @@ import { TypeOrmModule } from '@nestjs/typeorm';
 import { ConfigModule, ConfigService } from '@nestjs/config';
 import { Post } from '../../database/entities/post.entity';
 import { PostMedia } from '../../database/entities/post-media.entity';
-import { ContentPlan } from '../../database/entities/content-plan.entity';
 import { AiJob } from '../../database/entities/ai-job.entity';
 import { Business } from '../../database/entities/business.entity';
 import { Service } from '../../database/entities/service.entity';
 import { File } from '../../database/entities/file.entity';
-import { User } from '../../database/entities/user.entity';
 import { AiService } from './ai.service';
 import { AiController } from './ai.controller';
 import { AuthConfigModule } from '../auth/auth-config.module';
 import { PostEventsModule } from '../posts/post-events.module';
+import { PostsModule } from '../posts/posts.module';
 
 @Module({
   imports: [
     AuthConfigModule,
-    TypeOrmModule.forFeature([Post, PostMedia, ContentPlan, AiJob, Business, Service, File, User]),
+    PostsModule,
+    TypeOrmModule.forFeature([
+      Post,
+      PostMedia,
+      AiJob,
+      Business,
+      Service,
+      File,
+    ]),
     BullModule.registerQueueAsync({
       name: 'ai',
       imports: [ConfigModule],

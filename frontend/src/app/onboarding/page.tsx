@@ -1,11 +1,9 @@
-// src/app/onboarding/page.tsx
 "use client";
 
 import React, { useState, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
   Briefcase,
-  Clock,
   ShoppingBag,
   Loader2,
 } from "lucide-react";
@@ -19,14 +17,9 @@ import {
   FacebookPageOption,
 } from "@/core/services/business-service";
 import { Service } from "@/core/types/service";
-import {
-  CreateBusinessInput,
-  AutoPostConfigInput,
-} from "@/core/validations/business-schema";
+import { CreateBusinessInput } from "@/core/validations/business-schema";
 
-// นำเข้าคอมโพเนนต์ฟอร์มสเต็ปย่อยที่ทำ Refactoring ใหม่
 import Step1BusinessForm from "@/components/features/onboarding/step1-business-form";
-import Step2PostSettings from "@/components/features/onboarding/step2-post-settings";
 import Step3Services from "@/components/features/onboarding/step3-services";
 import Step4FbConnection from "@/components/features/onboarding/step4-fb-connection";
 
@@ -49,7 +42,6 @@ function OnboardingContent() {
   const [loading, setLoading] = useState(false);
   const [services, setServices] = useState<Service[]>([]);
 
-  // สำหรับเก็บสถานะโหลดรายการเพจและตัวเลือกเพจที่ได้รับจาก Facebook
   const [fbPages, setFbPages] = useState<FacebookPageOption[]>([]);
   const [loadingPages, setLoadingPages] = useState(false);
   const [selectedFbPageId, setSelectedFbPageId] = useState<string | null>(null);
@@ -62,12 +54,10 @@ function OnboardingContent() {
         ? "error"
         : "idle";
 
-  // ตรวจจับสิทธิ์การใช้งานของเพจ (การควบคุมเส้นทาง และการกู้คืนโปรไฟล์)
   useEffect(() => {
     let isMounted = true;
 
     const initializeAuth = async () => {
-      // 1. ตรวจสอบว่ามี Token ใน LocalStorage หรือไม่
       const refreshToken =
         typeof window !== "undefined"
           ? localStorage.getItem("refresh_token")
@@ -80,7 +70,6 @@ function OnboardingContent() {
       }
 
       try {
-        // 2. กู้คืนข้อมูลผู้ใช้หากแอปถูกรีเฟรชหน้าจอ (user ใน store มีค่าเป็น null)
         let currentUser = useAuthStore.getState().user;
         if (!currentUser || !useAuthStore.getState().isAuthenticated) {
           currentUser = await authService.getMe();
@@ -110,7 +99,6 @@ function OnboardingContent() {
     };
   }, [setAuth, router, clearAuth]);
 
-  // Sync businessId และสถานะเชื่อมต่อเพจจาก URL (หากข้ามกลับมาจาก Facebook OAuth)
   useEffect(() => {
     const bizId = searchParams.get("businessId");
     if (bizId) {
@@ -128,9 +116,8 @@ function OnboardingContent() {
     }
   }, [searchParams, setActiveBusinessId]);
 
-  // ดึงรายการเพจของผู้ใช้เมื่อเชื่อมต่อสำเร็จและอยู่ใน Step 4
   useEffect(() => {
-    if (step === 4 && activeBusinessId && fbStatus === "connected") {
+    if (step === 3 && activeBusinessId && fbStatus === "connected") {
       const timer = setTimeout(() => {
         setLoadingPages(true);
         businessService
@@ -148,7 +135,6 @@ function OnboardingContent() {
     }
   }, [step, activeBusinessId, fbStatus]);
 
-  // --- Step 1 Submit: Create Business ---
   const onSubmitStep1 = async (
     data: CreateBusinessInput,
     logoFile: File | null,
@@ -173,36 +159,10 @@ function OnboardingContent() {
     }
   };
 
-  // --- Step 2 Submit: Auto-Post Settings ---
-  const onSubmitStep2 = async (data: AutoPostConfigInput) => {
-    if (!activeBusinessId) {
-      toast.error("ไม่พบข้อมูลธุรกิจ กรุณากลับไปขั้นตอนแรก");
-      router.push("/onboarding?step=1");
-      return;
-    }
-
-    setLoading(true);
-    try {
-      await businessService.updateAutoPostConfig(activeBusinessId, data);
-      toast.success("บันทึกการตั้งค่าตารางโพสต์เรียบร้อย");
-      router.push("/onboarding?step=3");
-    } catch (err) {
-      const axiosError = err as { response?: { data?: { message?: string } } };
-      toast.error(
-        axiosError.response?.data?.message ||
-          "เกิดข้อผิดพลาดในการบันทึกการตั้งค่า",
-      );
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- Step 4 Submit: Connect Facebook Page ---
   const handleConnectFacebookOAuth = async () => {
     if (!activeBusinessId) return;
     setLoading(true);
     try {
-      // ดึงข้อมูลโปรไฟล์ผู้ใช้ล่าสุดเพื่อกระตุ้นให้ Axios Interceptor ต่ออายุ Token (หากหมดอายุแล้ว)
       await authService.getMe();
       const freshAccessToken = useAuthStore.getState().accessToken;
 
@@ -241,7 +201,6 @@ function OnboardingContent() {
     }
   };
 
-  // ดึงวันในการอัปเดตสเต็ปพารามิเตอร์กลับ
   const navigateToStep = (targetStep: number) => {
     router.push(`/onboarding?step=${targetStep}`);
   };
@@ -251,7 +210,6 @@ function OnboardingContent() {
       router.push("/dashboard");
       return;
     }
-
     navigateToStep(step - 1);
   };
 
@@ -266,26 +224,21 @@ function OnboardingContent() {
 
   return (
     <div className="min-h-screen bg-background text-foreground flex flex-col justify-between p-4 sm:p-6 md:p-8 relative overflow-hidden font-sans">
-      {/* Background Lighting Details */}
       <div className="absolute top-[-10%] left-[-10%] w-[500px] h-[500px] rounded-full bg-indigo-600/5 blur-[100px] pointer-events-none z-0" />
       <div className="absolute bottom-[-10%] right-[-10%] w-[500px] h-[500px] rounded-full bg-emerald-500/5 blur-[100px] pointer-events-none z-0" />
 
-      {/* Header and Step Indicator Tracker */}
       <div className="w-full max-w-2xl mx-auto space-y-6 pt-4 md:pt-8 mb-6">
-        {/* Step progress bullets */}
         <div className="relative flex justify-between items-center px-4 py-2 bg-neutral-900/20 border border-white/5 rounded-2xl max-w-md mx-auto">
-          {/* Progress bar line */}
           <div className="absolute top-[22px] left-[34px] right-[34px] h-[2px] bg-white/5 z-0" />
           <div
             className="absolute top-[22px] left-[34px] h-[2px] bg-primary transition-all duration-300 z-0"
-            style={{ width: `${((step - 1) / 3) * 82}%` }}
+            style={{ width: `${((step - 1) / 2) * 82}%` }}
           />
 
           {[
             { s: 1, label: "ข้อมูลธุรกิจ", icon: Briefcase },
-            { s: 2, label: "ตั้งค่าการโพสต์", icon: Clock },
-            { s: 3, label: "คลังสินค้า", icon: ShoppingBag },
-            { s: 4, label: "เชื่อมต่อเพจ", icon: FacebookIcon },
+            { s: 2, label: "คลังสินค้า", icon: ShoppingBag },
+            { s: 3, label: "เชื่อมต่อเพจ", icon: FacebookIcon },
           ].map((item) => {
             const Icon = item.icon;
             const isActive = step >= item.s;
@@ -323,7 +276,6 @@ function OnboardingContent() {
         </div>
       </div>
 
-      {/* Main Container Card */}
       <div className="max-w-2xl w-full mx-auto glass-panel glow-indigo rounded-2xl p-6 sm:p-8 shadow-2xl flex-1 flex flex-col justify-between z-10">
         {step === 1 && (
           <Step1BusinessForm
@@ -333,25 +285,17 @@ function OnboardingContent() {
           />
         )}
 
-        {step === 2 && (
-          <Step2PostSettings
-            onSubmit={onSubmitStep2}
-            loading={loading}
-            onBack={handleBack}
-          />
-        )}
-
-        {step === 3 && activeBusinessId && (
+        {step === 2 && activeBusinessId && (
           <Step3Services
             activeBusinessId={activeBusinessId}
             services={services}
             setServices={setServices}
-            onNext={() => navigateToStep(4)}
+            onNext={() => navigateToStep(3)}
             onBack={handleBack}
           />
         )}
 
-        {step === 4 && (
+        {step === 3 && (
           <Step4FbConnection
             fbStatus={fbStatus}
             fbPages={fbPages}
@@ -366,7 +310,6 @@ function OnboardingContent() {
         )}
       </div>
 
-      {/* Copyright footer */}
       <div className="text-center text-[10px] text-muted-foreground mt-6 select-none z-10">
         © 2026 ERP.AI. All rights reserved.
       </div>

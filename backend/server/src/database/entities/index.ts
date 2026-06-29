@@ -5,11 +5,8 @@ export { PasswordReset } from './password-reset.entity';
 export { File } from './file.entity';
 export type { FileKind } from './file.entity';
 export { Business } from './business.entity';
-export type { AutoPostMode, FixedScheduleRule } from './business.entity';
 export { Service } from './service.entity';
 export { FacebookPage } from './facebook-page.entity';
-export { ContentPlan } from './content-plan.entity';
-export type { ContentPlanStatus, DecidedBy } from './content-plan.entity';
 export { Post } from './post.entity';
 export type {
   PostStatus,

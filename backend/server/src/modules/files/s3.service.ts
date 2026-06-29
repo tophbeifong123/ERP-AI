@@ -29,6 +29,7 @@ export interface UploadResult {
 export class S3Service implements OnModuleInit {
   private readonly logger = new Logger(S3Service.name);
   private client: S3Client;
+  private presignClient: S3Client;
   private bucket: string;
   private publicUrl: string;
 
@@ -43,13 +44,32 @@ export class S3Service implements OnModuleInit {
       this.configService.get<string>('s3.publicUrl') ||
       `${endpoint}/${this.bucket}`;
 
+    const baseCreds = {
+      accessKeyId: accessKey || '',
+      secretAccessKey: secretKey || '',
+    };
+
+    // Client for backend's own operations (uploads, downloads) — uses
+    // whatever host the backend uses to reach MinIO (usually localhost).
     this.client = new S3Client({
       endpoint,
       region,
-      credentials: {
-        accessKeyId: accessKey || '',
-        secretAccessKey: secretKey || '',
-      },
+      credentials: baseCreds,
+      forcePathStyle: true,
+    });
+
+    // Client for presigned URLs that will be handed to EXTERNAL callers
+    // (e.g. n8n container). The host inside the presigned URL must be
+    // reachable by those callers. In docker-compose, MinIO is reachable
+    // as `minio:9000` from other containers but the backend (running on
+    // the host) reaches it as `localhost:9000`.
+    const presignEndpoint =
+      this.configService.get<string>('s3.presignEndpoint') ||
+      this.configService.get<string>('s3.endpoint');
+    this.presignClient = new S3Client({
+      endpoint: presignEndpoint,
+      region,
+      credentials: baseCreds,
       forcePathStyle: true,
     });
   }
@@ -112,7 +132,9 @@ export class S3Service implements OnModuleInit {
       ContentType: contentType,
     });
 
-    const presignedUrl = await getSignedUrl(this.client, command, {
+    // Use the presignClient so the URL host is reachable by external
+    // callers (e.g. n8n container reaching MinIO via docker hostname).
+    const presignedUrl = await getSignedUrl(this.presignClient, command, {
       expiresIn,
     });
     const expiresAt = new Date(Date.now() + expiresIn * 1000);
@@ -134,7 +156,7 @@ export class S3Service implements OnModuleInit {
       Key: key,
     });
 
-    return getSignedUrl(this.client, command, { expiresIn });
+    return getSignedUrl(this.presignClient, command, { expiresIn });
   }
 
   async deleteFile(key: string): Promise<void> {

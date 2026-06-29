@@ -7,8 +7,14 @@ from app.services.decision_service import process_decision
 router = APIRouter()
 
 
-@router.post("/decide", status_code=status.HTTP_202_ACCEPTED, dependencies=[Depends(verify_internal_token)])
-async def decide_post(request: DecisionRequest, background_tasks: BackgroundTasks):
-    """AI Decision (async): accept the job, then POST the decision to callbackUrl."""
+@router.post(
+    "/recommend-time",
+    status_code=status.HTTP_202_ACCEPTED,
+    dependencies=[Depends(verify_internal_token)],
+)
+async def recommend_post_time(
+    request: DecisionRequest, background_tasks: BackgroundTasks
+):
+    """AI Time Recommender (async): accept the job, POST the suggestion to callbackUrl."""
     background_tasks.add_task(process_decision, request)
-    return {"status": "accepted", "planId": request.plan_id}
+    return {"status": "accepted", "jobId": request.job_id}

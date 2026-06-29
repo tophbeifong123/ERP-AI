@@ -63,25 +63,50 @@ def _build_prompt(req: CaptionRequest) -> str:
 
 
 def build_caption(req: CaptionRequest) -> CaptionResult:
-    """Core logic: generate a single Thai caption (hashtags embedded)."""
-    prompt = _build_prompt(req)
-    response = client.chat.completions.create(
-        model=MODEL,
-        messages=[
-            {"role": "system", "content": "คุณเป็นนักเขียนแคปชั่นการตลาดภาษาไทย ตอบกลับด้วย JSON ที่ถูกต้องเท่านั้น"},
-            {"role": "user", "content": prompt},
-        ],
-        temperature=0.8,
-        max_tokens=600,
-    )
+    """Core logic: generate a single Thai caption (hashtags embedded).
 
-    raw = response.choices[0].message.content.strip()
-    if raw.startswith("```"):
-        raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
-    data = json.loads(raw)
+    If the LLM call fails, fall back to a template that wraps the user's
+    hint in a Thai-looking caption with a basic hashtag set.
+    """
+    try:
+        prompt = _build_prompt(req)
+        response = client.chat.completions.create(
+            model=MODEL,
+            messages=[
+                {"role": "system", "content": "คุณเป็นนักเขียนแคปชั่นการตลาดภาษาไทย ตอบกลับด้วย JSON ที่ถูกต้องเท่านั้น"},
+                {"role": "user", "content": prompt},
+            ],
+            temperature=0.8,
+            max_tokens=600,
+        )
 
-    caption = data["caption"].strip()[:MAX_CAPTION_CHARS]
-    return CaptionResult(caption=caption)
+        raw = response.choices[0].message.content.strip()
+        if raw.startswith("```"):
+            raw = raw.split("\n", 1)[1].rsplit("```", 1)[0].strip()
+        data = json.loads(raw)
+
+        caption = data["caption"].strip()[:MAX_CAPTION_CHARS]
+        if caption:
+            return CaptionResult(caption=caption)
+    except Exception as e:
+        # Fall through to the fallback below
+        import logging
+        logging.warning(f"Caption LLM call failed, using hint fallback: {e}")
+
+    # Fallback: build a basic Thai caption from the hint and business name.
+    hint = (req.caption_hint or "").strip()
+    biz_name = req.business.name or "ร้านค้า"
+    type_label = {
+        "promotion": "โปรโมชั่น",
+        "product_showcase": "แนะนำสินค้า",
+        "brand_awareness": "สร้างแบรนด์",
+        "event": "กิจกรรม",
+    }.get(req.post_type.value if req.post_type else "", "อัปเดต")
+    hashtag_pool = ["#marketing", "#ร้านค้า", "#โปรโมชั่น", "#ขายดี", "#ลดราคา"]
+    hashtags = " ".join(hashtag_pool[:3])
+    body = hint if hint else f"{biz_name} มีอะไรน่าสนใจมากมาย ติดตามได้เลย"
+    fallback = f"✨ {biz_name}\n\n{type_label}: {body}\n\nสนใจสอบถามข้อมูลเพิ่มเติมได้เลยค่ะ 👇\n\n{hashtags}"
+    return CaptionResult(caption=fallback[:MAX_CAPTION_CHARS])
 
 
 def process_caption(req: CaptionRequest) -> None:

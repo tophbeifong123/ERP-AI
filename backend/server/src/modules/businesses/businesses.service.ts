@@ -1,17 +1,12 @@
 import { Injectable, NotFoundException } from '@nestjs/common';
 import { InjectRepository } from '@nestjs/typeorm';
 import { IsNull, Repository } from 'typeorm';
-import {
-  Business,
-  FixedScheduleRule,
-} from '../../database/entities/business.entity';
+import { Business } from '../../database/entities/business.entity';
 import {
   CreateBusinessDto,
-  UpdateAutoPostDto,
   UpdateBusinessDto,
 } from './dto/business.dto';
 import { FilesService } from '../files/files.service';
-import { FileKind } from '../../database/entities/file.entity';
 
 @Injectable()
 export class BusinessesService {
@@ -45,11 +40,6 @@ export class BusinessesService {
       targetAudience: dto.targetAudience ?? null,
       tone: dto.tone ?? null,
       keywords: dto.keywords ?? [],
-      autoPostEnabled: dto.autoPost?.enabled ?? false,
-      autoPostMode: dto.autoPost?.mode ?? null,
-      postsPerWeekTarget: dto.autoPost?.postsPerWeekTarget ?? 3,
-      minGapDays: dto.autoPost?.minGapDays ?? 1,
-      fixedScheduleRules: dto.autoPost?.fixedScheduleRules ?? [],
       logoFileId,
     });
     return this.businessRepo.save(business);
@@ -111,15 +101,5 @@ export class BusinessesService {
     business.logoFileId = saved.id;
     await this.businessRepo.save(business);
     return saved;
-  }
-
-  async updateAutoPost(id: string, dto: UpdateAutoPostDto): Promise<Business> {
-    const business = await this.getOne(id);
-    business.autoPostEnabled = dto.enabled;
-    business.autoPostMode = dto.mode;
-    business.postsPerWeekTarget = dto.postsPerWeekTarget;
-    business.minGapDays = dto.minGapDays;
-    business.fixedScheduleRules = dto.fixedScheduleRules;
-    return this.businessRepo.save(business);
   }
 }

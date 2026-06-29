@@ -28,8 +28,8 @@ export class PostsController {
   @Post()
   @HttpCode(HttpStatus.CREATED)
   async create(@CurrentUser('id') userId: string, @Body() dto: CreatePostDto) {
-    const post = await this.postsService.create(userId, dto);
-    return { post };
+    const { post, jobs } = await this.postsService.create(userId, dto);
+    return { post, jobs };
   }
 
   @Get()

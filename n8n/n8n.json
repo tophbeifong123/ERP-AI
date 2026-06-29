@@ -11,7 +11,10 @@
       },
       "type": "n8n-nodes-base.webhook",
       "typeVersion": 2,
-      "position": [-1280, 480],
+      "position": [
+        -1280,
+        480
+      ],
       "id": "wh-media-001",
       "name": "Webhook - Media Request",
       "webhookId": "ai-media-webhook-001",
@@ -28,12 +31,18 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-1040, 480],
+      "position": [
+        -1040,
+        480
+      ],
       "id": "node-validate",
       "name": "Validate Input",
       "onError": "continueErrorOutput",
       "errorOutputBranch": [
-        { "branch": "image", "message": "Validation failed" }
+        {
+          "branch": "image",
+          "message": "Validation failed"
+        }
       ]
     },
     {
@@ -42,7 +51,10 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-820, 760],
+      "position": [
+        -820,
+        760
+      ],
       "id": "node-err-callback",
       "name": "Send Validation Error Callback"
     },
@@ -50,11 +62,16 @@
       "parameters": {
         "respondWith": "json",
         "responseBody": "={\n  \"status\": \"error\",\n  \"code\": \"INVALID_REQUEST\",\n  \"message\": \"{{ $json.error }}\"\n}",
-        "options": { "responseCode": 400 }
+        "options": {
+          "responseCode": 400
+        }
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [-560, 760],
+      "position": [
+        -560,
+        760
+      ],
       "id": "node-err-ack",
       "name": "Ack Validation Error (400)"
     },
@@ -64,9 +81,19 @@
           "values": [
             {
               "conditions": {
-                "options": { "caseSensitive": true },
+                "options": {
+                  "caseSensitive": true
+                },
                 "conditions": [
-                  { "id": "cond-image", "leftValue": "={{ $json.type }}", "rightValue": "image", "operator": { "type": "string", "operation": "equals" } }
+                  {
+                    "id": "cond-image",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "image",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
                 ],
                 "combinator": "and"
               },
@@ -75,9 +102,19 @@
             },
             {
               "conditions": {
-                "options": { "caseSensitive": true },
+                "options": {
+                  "caseSensitive": true
+                },
                 "conditions": [
-                  { "id": "cond-video", "leftValue": "={{ $json.type }}", "rightValue": "short_video", "operator": { "type": "string", "operation": "equals" } }
+                  {
+                    "id": "cond-video",
+                    "leftValue": "={{ $json.type }}",
+                    "rightValue": "short_video",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
                 ],
                 "combinator": "and"
               },
@@ -86,11 +123,16 @@
             }
           ]
         },
-        "options": { "fallbackOutput": "extra" }
+        "options": {
+          "fallbackOutput": "extra"
+        }
       },
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [-800, 480],
+      "position": [
+        -800,
+        480
+      ],
       "id": "node-route-type",
       "name": "Route by Type"
     },
@@ -100,7 +142,10 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-560, 240],
+      "position": [
+        -560,
+        240
+      ],
       "id": "node-prep-img-prompt",
       "name": "Prepare Image Prompt"
     },
@@ -113,31 +158,45 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.api_body) }}",
-        "options": { "timeout": 60000 }
+        "options": {
+          "timeout": 60000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-320, 240],
+      "position": [
+        -320,
+        240
+      ],
       "id": "node-enhance-img",
       "name": "Enhance Image Prompt (Gemini)",
       "retryOnFail": true,
       "maxTries": 5,
       "waitBetweenTries": 5000,
       "credentials": {
-        "googleOAuth2Api": { "id": "GOOGLE_OAUTH_PLACEHOLDER", "name": "Google account" }
+        "googleOAuth2Api": {
+          "id": "GnR7pOOGjfC2LHur",
+          "name": "Google account"
+        }
       }
     },
     {
       "parameters": {
         "conditions": {
           "boolean": [
-            { "value1": "={{ $('Validate Input').first().json.hasReference }}", "value2": true }
+            {
+              "value1": "={{ $('Validate Input').first().json.hasReference }}",
+              "value2": true
+            }
           ]
         }
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [-80, 240],
+      "position": [
+        -80,
+        240
+      ],
       "id": "node-has-ref-img",
       "name": "Has Ref Image?"
     },
@@ -148,7 +207,10 @@
       },
       "type": "n8n-nodes-base.splitOut",
       "typeVersion": 1,
-      "position": [160, 80],
+      "position": [
+        160,
+        80
+      ],
       "id": "node-split-refs",
       "name": "Split Refs"
     },
@@ -156,13 +218,20 @@
       "parameters": {
         "url": "={{ $json.referenceImageUrls }}",
         "options": {
-          "response": { "response": { "responseFormat": "file" } },
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
           "timeout": 30000
         }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [400, 80],
+      "position": [
+        400,
+        80
+      ],
       "id": "node-download-refs",
       "name": "Download Refs"
     },
@@ -172,7 +241,10 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [640, 240],
+      "position": [
+        640,
+        240
+      ],
       "id": "node-build-img",
       "name": "Build Image Request"
     },
@@ -185,15 +257,23 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.api_body) }}",
-        "options": { "timeout": 120000 }
+        "options": {
+          "timeout": 120000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [880, 240],
+      "position": [
+        880,
+        240
+      ],
       "id": "node-generate-img",
       "name": "Generate Image (Nano Banana)",
       "credentials": {
-        "googleOAuth2Api": { "id": "GOOGLE_OAUTH_PLACEHOLDER", "name": "Google account" }
+        "googleOAuth2Api": {
+          "id": "GnR7pOOGjfC2LHur",
+          "name": "Google account"
+        }
       }
     },
     {
@@ -202,7 +282,10 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1120, 240],
+      "position": [
+        1120,
+        240
+      ],
       "id": "node-convert-img-bin",
       "name": "Convert Image to Binary"
     },
@@ -211,36 +294,115 @@
         "method": "PUT",
         "url": "={{ $('Validate Input').first().json.upload.presignedUrl }}",
         "sendBody": true,
-        "specifyBody": "binary",
-        "binaryPropertyName": "data",
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
         "options": {
-          "response": { "response": { "responseFormat": "string" } },
-          "timeout": 120000
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "neverError": true,
+              "fullResponse": true
+            }
+          },
+          "timeout": 120000,
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 0,
+              "followRedirects": false
+            }
+          }
         }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1360, 240],
+      "position": [
+        1360,
+        240
+      ],
       "id": "node-upload-img-minio",
-      "name": "PUT Image to MinIO"
+      "name": "PUT Image to MinIO",
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "jsCode": "const data = $('Convert Image to Binary').first().json;\nconst putResp = $('PUT Image to MinIO').first();\nconst status = putResp.statusCode || 0;\n\nif (!(status >= 200 && status < 300)) {\n  throw new Error('MinIO PUT for image returned status ' + status + ': ' + (putResp.body || '').toString().slice(0, 300));\n}\n\nconst upload = data.original.upload;\nconst payload = {\n  jobId: data.original.jobId,\n  result: {\n    storageKey: upload.storageKey,\n    publicUrl: upload.publicUrl,\n    mime: data.mime,\n    sizeBytes: data.size_bytes,\n    width: null,\n    height: null,\n    durationSec: null,\n  },\n};\n\nreturn [{\n  json: {\n    callbackUrl: data.original.callbackUrl,\n    payload,\n  }\n}];"
+        "jsCode": "const ctx = $('Validate Input').first().json || {};\nconst err = ($json && $json.error) || {};\nconst message = (err.message || err.description || 'MinIO upload (image) failed').toString().slice(0, 1000);\nif (ctx.callbackUrl && ctx.jobId) {\n  return [{\n    json: {\n      callbackUrl: ctx.callbackUrl,\n      payload: {\n        jobId: ctx.jobId,\n        error: { code: 'upload_failed', message, type: ctx.type || 'image' },\n      },\n    }\n  }];\n}\nreturn [{ json: { ok: false, error: message } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1600, 240],
-      "id": "node-prepare-img-cb",
-      "name": "Prepare Image Callback"
+      "position": [
+        1360,
+        380
+      ],
+      "id": "node-img-err-format",
+      "name": "Format Image Upload Error"
     },
     {
       "parameters": {
-        "conditions": { "boolean": [{ "value1": "={{ !!$json.callbackUrl }}", "value2": true }] }
+        "method": "POST",
+        "url": "={{ $json.callbackUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_API_KEY }}",
+              "parameterType": "string"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1600,
+        380
+      ],
+      "id": "node-img-err-send",
+      "name": "Send Image Upload Error",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "INTERNAL_TOKEN_CRED",
+          "name": "Internal Token (X-Internal-Token)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let data = null;\ntry { data = $('Convert Image to Binary').first().json; } catch (e) {}\nlet putResp = null;\ntry { putResp = $('PUT Image to MinIO').first().json; } catch (e) {}\nconst status = (putResp && (putResp.statusCode || putResp.status)) || 0;\nconst body = putResp && putResp.body ? putResp.body.toString().slice(0, 300) : '';\n\nif (!data || !data.original) {\n  throw new Error('Prepare Image Callback: missing context (data/original).');\n}\nif (!(status >= 200 && status < 300)) {\n  throw new Error('MinIO PUT for image returned status ' + status + ': ' + body);\n}\n\nconst upload = data.original.upload;\nconst payload = {\n  jobId: data.original.jobId,\n  result: {\n    storageKey: upload.storageKey,\n    publicUrl: upload.publicUrl,\n    mime: data.mime,\n    sizeBytes: data.size_bytes,\n    width: null,\n    height: null,\n    durationSec: null,\n  },\n};\n\nreturn [{\n  json: {\n    callbackUrl: data.original.callbackUrl,\n    payload,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1600,
+        240
+      ],
+      "id": "node-prepare-img-cb",
+      "name": "Prepare Image Callback",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "conditions": {
+          "boolean": [
+            {
+              "value1": "={{ !!$json.callbackUrl }}",
+              "value2": true
+            }
+          ]
+        }
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [1840, 240],
+      "position": [
+        1840,
+        240
+      ],
       "id": "node-has-img-cb",
       "name": "Has Callback?"
     },
@@ -251,32 +413,49 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_API_KEY }}", "parameterType": "string" }
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_API_KEY }}",
+              "parameterType": "string"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.payload) }}",
-        "options": { "timeout": 30000 }
+        "options": {
+          "timeout": 30000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2080, 240],
+      "position": [
+        2080,
+        240
+      ],
       "id": "node-send-img-cb",
       "name": "Send Image Callback",
       "credentials": {
-        "httpHeaderAuth": { "id": "INTERNAL_TOKEN_CRED", "name": "Internal Token (X-Internal-Token)" }
+        "httpHeaderAuth": {
+          "id": "INTERNAL_TOKEN_CRED",
+          "name": "Internal Token (X-Internal-Token)"
+        }
       }
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={\n  \"status\": \"accepted\",\n  \"jobId\": \"{{ $('Validate Input').first().json.jobId }}\",\n  \"message\": \"Image generation in progress. Result will be POSTed to callbackUrl.\"\n}",
-        "options": { "responseCode": 202 }
+        "options": {
+          "responseCode": 202
+        }
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [-560, 720],
+      "position": [
+        -560,
+        720
+      ],
       "id": "node-ack-img",
       "name": "Acknowledge Image (202)"
     },
@@ -286,7 +465,10 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [-560, 480],
+      "position": [
+        -560,
+        480
+      ],
       "id": "node-prep-vid-prompt",
       "name": "Prepare Video Prompt"
     },
@@ -299,47 +481,86 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.api_body) }}",
-        "options": { "timeout": 60000 }
+        "options": {
+          "timeout": 60000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [-320, 480],
+      "position": [
+        -320,
+        480
+      ],
       "id": "node-enhance-vid",
       "name": "Enhance Video Prompt (Gemini)",
       "retryOnFail": true,
       "maxTries": 5,
       "waitBetweenTries": 5000,
       "credentials": {
-        "googleOAuth2Api": { "id": "GOOGLE_OAUTH_PLACEHOLDER", "name": "Google account" }
+        "googleOAuth2Api": {
+          "id": "GnR7pOOGjfC2LHur",
+          "name": "Google account"
+        }
       }
     },
     {
       "parameters": {
         "conditions": {
           "boolean": [
-            { "value1": "={{ $('Validate Input').first().json.hasReference }}", "value2": true }
+            {
+              "value1": "={{ $('Validate Input').first().json.hasReference }}",
+              "value2": true
+            }
           ]
         }
       },
       "type": "n8n-nodes-base.if",
       "typeVersion": 1,
-      "position": [-80, 480],
+      "position": [
+        -80,
+        480
+      ],
       "id": "node-has-ref-vid",
       "name": "Has Ref Video?"
     },
     {
       "parameters": {
-        "url": "={{ $('Validate Input').first().json.referenceImageUrls[0] }}",
+        "url": "={{ (() => {  const u = ($('Validate Input').first().json.referenceImageUrls[0]) || '';  if (!u.startsWith('gs://')) return u;  const rest = u.slice(5);  const slash = rest.indexOf('/');  if (slash < 0) return u;  const bucket = rest.slice(0, slash);  const obj = rest.slice(slash + 1);  return `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodeURIComponent(obj)}?alt=media`;})() }}",
         "options": {
-          "response": { "response": { "responseFormat": "file" } },
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
           "timeout": 30000
+        },
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "googleOAuth2Api",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_API_KEY }}",
+              "parameterType": "string"
+            }
+          ]
         }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [160, 320],
+      "position": [
+        160,
+        320
+      ],
       "id": "node-download-vid-ref",
-      "name": "Download Video Ref"
+      "name": "Download Video Ref",
+      "credentials": {
+        "googleOAuth2Api": {
+          "id": "GnR7pOOGjfC2LHur",
+          "name": "Google account"
+        }
+      }
     },
     {
       "parameters": {
@@ -347,7 +568,10 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [400, 480],
+      "position": [
+        400,
+        480
+      ],
       "id": "node-build-vid",
       "name": "Build Video Job"
     },
@@ -360,15 +584,23 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.api_body) }}",
-        "options": { "timeout": 300000 }
+        "options": {
+          "timeout": 300000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [640, 480],
+      "position": [
+        640,
+        480
+      ],
       "id": "node-submit-vid",
       "name": "Submit Video Job (Veo 3.1)",
       "credentials": {
-        "googleOAuth2Api": { "id": "GOOGLE_OAUTH_PLACEHOLDER", "name": "Google account" }
+        "googleOAuth2Api": {
+          "id": "GnR7pOOGjfC2LHur",
+          "name": "Google account"
+        }
       }
     },
     {
@@ -377,7 +609,10 @@
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [880, 480],
+      "position": [
+        880,
+        480
+      ],
       "id": "node-extract-task",
       "name": "Extract Task Info"
     },
@@ -387,7 +622,10 @@
       },
       "type": "n8n-nodes-base.wait",
       "typeVersion": 1.1,
-      "position": [1120, 480],
+      "position": [
+        1120,
+        480
+      ],
       "id": "node-wait-20s",
       "name": "Wait 20s",
       "webhookId": "vid-poll-wait-001"
@@ -401,24 +639,35 @@
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={\"operationName\":\"{{ $json.task_id }}\"}",
-        "options": { "timeout": 15000 }
+        "options": {
+          "timeout": 15000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [1360, 480],
+      "position": [
+        1360,
+        480
+      ],
       "id": "node-check-vid",
       "name": "Check Video Status",
       "credentials": {
-        "googleOAuth2Api": { "id": "GOOGLE_OAUTH_PLACEHOLDER", "name": "Google account" }
+        "googleOAuth2Api": {
+          "id": "GnR7pOOGjfC2LHur",
+          "name": "Google account"
+        }
       }
     },
     {
       "parameters": {
-        "jsCode": "const statusResponse = $input.first().json;\nconst taskInfo = $('Extract Task Info').first().json;\n\nconst elapsed = Date.now() - new Date(taskInfo.submitted_at).getTime();\nconst maxDuration = 10 * 60 * 1000;\n\nif (elapsed > maxDuration) {\n  return [{\n    json: {\n      status: 'failed',\n      error_message: 'Video generation timed out after ' + Math.round(elapsed / 1000) + 's',\n      task_id: taskInfo.task_id,\n      original: taskInfo.original,\n    }\n  }];\n}\n\nconst isDone = statusResponse.done === true;\nlet gcsUri = null;\nlet errorMsg = null;\nlet width = null, height = null, durationSec = null;\n\nif (isDone) {\n  const apiError = statusResponse.error || (statusResponse.response && statusResponse.response.error);\n  if (apiError) {\n    errorMsg = apiError.message || JSON.stringify(apiError);\n  } else {\n    gcsUri = (statusResponse.response && statusResponse.response.videos && statusResponse.response.videos[0] && statusResponse.response.videos[0].gcsUri)\n      || (statusResponse.response && statusResponse.response.generateVideoResponse && statusResponse.response.generateVideoResponse.generatedSamples && statusResponse.response.generateVideoResponse.generatedSamples[0] && statusResponse.response.generateVideoResponse.generatedSamples[0].video && statusResponse.response.generateVideoResponse.generatedSamples[0].video.uri)\n      || null;\n    if (!gcsUri) {\n      errorMsg = 'Could not find video URI: ' + JSON.stringify(statusResponse).slice(0, 800);\n    } else {\n      const meta = (statusResponse.response && statusResponse.response.videos && statusResponse.response.videos[0]) || (statusResponse.response && statusResponse.response.generateVideoResponse && statusResponse.response.generateVideoResponse.generatedSamples && statusResponse.response.generateVideoResponse.generatedSamples[0]);\n      width = (meta && meta.width) || null;\n      height = (meta && meta.height) || null;\n      durationSec = (meta && (meta.durationSeconds || meta.durationSec)) || 8;\n    }\n  }\n}\n\nlet normalizedStatus = 'processing';\nif (isDone) {\n  normalizedStatus = errorMsg ? 'failed' : 'completed';\n}\n\nreturn [{\n  json: {\n    status: normalizedStatus,\n    gcs_url: gcsUri,\n    error_message: errorMsg,\n    task_id: taskInfo.task_id,\n    original: taskInfo.original,\n    enhanced_prompt: taskInfo.enhanced_prompt,\n    width, height, durationSec,\n  }\n}];"
+        "jsCode": "const statusResponse = $input.first().json;\nconst taskInfo = $('Extract Task Info').first().json;\n\nconst elapsed = Date.now() - new Date(taskInfo.submitted_at).getTime();\nconst maxDuration = 10 * 60 * 1000;\n\nif (elapsed > maxDuration) {\n  return [{\n    json: {\n      status: 'failed',\n      error_message: 'Video generation timed out after ' + Math.round(elapsed / 1000) + 's',\n      task_id: taskInfo.task_id,\n      original: taskInfo.original,\n    }\n  }];\n}\n\nconst isDone = statusResponse.done === true;\nlet gcsUri = null;\nlet errorMsg = null;\nlet width = null, height = null, durationSec = null;\n\nif (isDone) {\n  const apiError = statusResponse.error || (statusResponse.response && statusResponse.response.error);\n  if (apiError) {\n    errorMsg = apiError.message || JSON.stringify(apiError);\n  } else {\n    const rai = statusResponse.response;\n    if (rai && (Number(rai.raiMediaFilteredCount) > 0\n        || (Array.isArray(rai.raiMediaFilteredReasons) && rai.raiMediaFilteredReasons.length > 0))) {\n      const reasons = (rai.raiMediaFilteredReasons || []).join('; ');\n      errorMsg = 'Content was filtered by Vertex AI safety check' + (reasons ? ': ' + reasons : '');\n    } else {\n      gcsUri = (statusResponse.response && statusResponse.response.videos && statusResponse.response.videos[0] && statusResponse.response.videos[0].gcsUri)\n        || (statusResponse.response && statusResponse.response.generateVideoResponse && statusResponse.response.generateVideoResponse.generatedSamples && statusResponse.response.generateVideoResponse.generatedSamples[0] && statusResponse.response.generateVideoResponse.generatedSamples[0].video && statusResponse.response.generateVideoResponse.generatedSamples[0].video.uri)\n        || null;\n      if (!gcsUri) {\n        errorMsg = 'Could not find video URI: ' + JSON.stringify(statusResponse).slice(0, 800);\n      } else {\n        const meta = (statusResponse.response && statusResponse.response.videos && statusResponse.response.videos[0]) || (statusResponse.response && statusResponse.response.generateVideoResponse && statusResponse.response.generateVideoResponse.generatedSamples && statusResponse.response.generateVideoResponse.generatedSamples[0]);\n        width = (meta && meta.width) || null;\n        height = (meta && meta.height) || null;\n        durationSec = (meta && (meta.durationSeconds || meta.durationSec)) || 8;\n      }\n    }\n  }\n}\n\nlet normalizedStatus = 'processing';\nif (isDone) {\n  normalizedStatus = errorMsg ? 'failed' : 'completed';\n}\n\nreturn [{\n  json: {\n    status: normalizedStatus,\n    gcs_url: gcsUri,\n    error_message: errorMsg,\n    task_id: taskInfo.task_id,\n    original: taskInfo.original,\n    enhanced_prompt: taskInfo.enhanced_prompt,\n    width, height, durationSec,\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [1600, 480],
+      "position": [
+        1600,
+        480
+      ],
       "id": "node-eval-vid",
       "name": "Evaluate Video Status"
     },
@@ -428,9 +677,19 @@
           "values": [
             {
               "conditions": {
-                "options": { "caseSensitive": true },
+                "options": {
+                  "caseSensitive": true
+                },
                 "conditions": [
-                  { "id": "cond-completed", "leftValue": "={{ $json.status }}", "rightValue": "completed", "operator": { "type": "string", "operation": "equals" } }
+                  {
+                    "id": "cond-completed",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "completed",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
                 ],
                 "combinator": "and"
               },
@@ -439,9 +698,19 @@
             },
             {
               "conditions": {
-                "options": { "caseSensitive": true },
+                "options": {
+                  "caseSensitive": true
+                },
                 "conditions": [
-                  { "id": "cond-processing", "leftValue": "={{ $json.status }}", "rightValue": "processing", "operator": { "type": "string", "operation": "equals" } }
+                  {
+                    "id": "cond-processing",
+                    "leftValue": "={{ $json.status }}",
+                    "rightValue": "processing",
+                    "operator": {
+                      "type": "string",
+                      "operation": "equals"
+                    }
+                  }
                 ],
                 "combinator": "and"
               },
@@ -450,31 +719,56 @@
             }
           ]
         },
-        "options": { "fallbackOutput": "extra" }
+        "options": {
+          "fallbackOutput": "extra"
+        }
       },
       "type": "n8n-nodes-base.switch",
       "typeVersion": 3,
-      "position": [1840, 480],
+      "position": [
+        1840,
+        480
+      ],
       "id": "node-route-vid",
       "name": "Route Video Status"
     },
     {
       "parameters": {
-        "url": "={{ $json.gcs_url || $('Evaluate Video Status').last().json.gcs_url }}",
+        "url": "={{ (() => {  const u = ($json.gcs_url || $('Evaluate Video Status').last().json.gcs_url) || '';  if (!u.startsWith('gs://')) return u;  const rest = u.slice(5);  const slash = rest.indexOf('/');  if (slash < 0) return u;  const bucket = rest.slice(0, slash);  const obj = rest.slice(slash + 1);  return `https://storage.googleapis.com/storage/v1/b/${bucket}/o/${encodeURIComponent(obj)}?alt=media`;})() }}",
         "authentication": "predefinedCredentialType",
         "nodeCredentialType": "googleOAuth2Api",
         "options": {
-          "response": { "response": { "responseFormat": "file" } },
+          "response": {
+            "response": {
+              "responseFormat": "file"
+            }
+          },
           "timeout": 180000
+        },
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_API_KEY }}",
+              "parameterType": "string"
+            }
+          ]
         }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2080, 480],
+      "position": [
+        2080,
+        480
+      ],
       "id": "node-download-vid",
       "name": "Download Video (GCS)",
       "credentials": {
-        "googleOAuth2Api": { "id": "GOOGLE_OAUTH_PLACEHOLDER", "name": "Google account" }
+        "googleOAuth2Api": {
+          "id": "GnR7pOOGjfC2LHur",
+          "name": "Google account"
+        }
       }
     },
     {
@@ -482,28 +776,47 @@
         "method": "PUT",
         "url": "={{ $('Validate Input').first().json.upload.presignedUrl }}",
         "sendBody": true,
-        "specifyBody": "binary",
-        "binaryPropertyName": "data",
+        "contentType": "binaryData",
+        "inputDataFieldName": "data",
         "options": {
-          "response": { "response": { "responseFormat": "string" } },
-          "timeout": 180000
+          "response": {
+            "response": {
+              "responseFormat": "text",
+              "neverError": true,
+              "fullResponse": true
+            }
+          },
+          "timeout": 300000,
+          "redirect": {
+            "redirect": {
+              "maxRedirects": 0,
+              "followRedirects": false
+            }
+          }
         }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2320, 480],
+      "position": [
+        2320,
+        480
+      ],
       "id": "node-upload-vid-minio",
-      "name": "PUT Video to MinIO"
+      "name": "PUT Video to MinIO",
+      "onError": "continueErrorOutput"
     },
     {
       "parameters": {
-        "jsCode": "const evalData = $('Evaluate Video Status').last().json;\nconst putResp = $('PUT Video to MinIO').first();\nconst status = putResp.statusCode || 0;\nif (!(status >= 200 && status < 300)) {\n  throw new Error('MinIO PUT for video returned status ' + status + ': ' + (putResp.body || '').toString().slice(0, 300));\n}\n\nconst upload = evalData.original.upload;\nconst payload = {\n  jobId: evalData.original.jobId,\n  result: {\n    storageKey: upload.storageKey,\n    publicUrl: upload.publicUrl,\n    mime: 'video/mp4',\n    sizeBytes: null,\n    width: evalData.width,\n    height: evalData.height,\n    durationSec: evalData.durationSec,\n  },\n};\n\nreturn [{\n  json: {\n    callbackUrl: evalData.original.callbackUrl,\n    payload,\n  }\n}];"
+        "jsCode": "const ctx = $('Validate Input').first().json || {};\nconst err = ($json && $json.error) || {};\nconst message = (err.message || err.description || 'MinIO upload (video) failed').toString().slice(0, 1000);\nif (ctx.callbackUrl && ctx.jobId) {\n  return [{\n    json: {\n      callbackUrl: ctx.callbackUrl,\n      payload: {\n        jobId: ctx.jobId,\n        error: { code: 'upload_failed', message, type: ctx.type || 'short_video' },\n      },\n    }\n  }];\n}\nreturn [{ json: { ok: false, error: message } }];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2560, 480],
-      "id": "node-prepare-vid-cb",
-      "name": "Prepare Video Callback"
+      "position": [
+        2320,
+        620
+      ],
+      "id": "node-vid-err-format",
+      "name": "Format Video Upload Error"
     },
     {
       "parameters": {
@@ -512,42 +825,112 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_API_KEY }}", "parameterType": "string" }
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_API_KEY }}",
+              "parameterType": "string"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.payload) }}",
-        "options": { "timeout": 30000 }
+        "options": {
+          "timeout": 30000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2800, 480],
+      "position": [
+        2560,
+        620
+      ],
+      "id": "node-vid-err-send",
+      "name": "Send Video Upload Error",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": "INTERNAL_TOKEN_CRED",
+          "name": "Internal Token (X-Internal-Token)"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "let evalData = null;\ntry { evalData = $('Evaluate Video Status').last().json; } catch (e) {}\nlet putResp = null;\ntry { putResp = $('PUT Video to MinIO').first().json; } catch (e) {}\nconst status = (putResp && (putResp.statusCode || putResp.status)) || 0;\nconst body = putResp && putResp.body ? putResp.body.toString().slice(0, 300) : '';\n\nif (!evalData || !evalData.original) {\n  throw new Error('Prepare Video Callback: missing context (evalData/original).');\n}\nif (!(status >= 200 && status < 300)) {\n  throw new Error('MinIO PUT for video returned status ' + status + ': ' + body);\n}\n\nconst upload = evalData.original.upload;\nconst payload = {\n  jobId: evalData.original.jobId,\n  result: {\n    storageKey: upload.storageKey,\n    publicUrl: upload.publicUrl,\n    mime: 'video/mp4',\n    sizeBytes: null,\n    width: evalData.width,\n    height: evalData.height,\n    durationSec: evalData.durationSec,\n  },\n};\n\nreturn [{\n  json: {\n    callbackUrl: evalData.original.callbackUrl,\n    payload,\n  }\n}];"
+      },
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        2560,
+        480
+      ],
+      "id": "node-prepare-vid-cb",
+      "name": "Prepare Video Callback",
+      "onError": "continueErrorOutput"
+    },
+    {
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.callbackUrl }}",
+        "sendHeaders": true,
+        "headerParameters": {
+          "parameters": [
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_API_KEY }}",
+              "parameterType": "string"
+            }
+          ]
+        },
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.payload) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        2800,
+        480
+      ],
       "id": "node-send-vid-cb",
       "name": "Send Video Callback",
       "credentials": {
-        "httpHeaderAuth": { "id": "INTERNAL_TOKEN_CRED", "name": "Internal Token (X-Internal-Token)" }
+        "httpHeaderAuth": {
+          "id": "INTERNAL_TOKEN_CRED",
+          "name": "Internal Token (X-Internal-Token)"
+        }
       }
     },
     {
       "parameters": {
         "respondWith": "json",
         "responseBody": "={\n  \"status\": \"accepted\",\n  \"jobId\": \"{{ $('Validate Input').first().json.jobId }}\",\n  \"message\": \"Short-video generation in progress. Result will be POSTed to callbackUrl.\"\n}",
-        "options": { "responseCode": 202 }
+        "options": {
+          "responseCode": 202
+        }
       },
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
-      "position": [400, 720],
+      "position": [
+        400,
+        720
+      ],
       "id": "node-ack-vid",
       "name": "Acknowledge Video (202)"
     },
     {
       "parameters": {
-        "jsCode": "const data = $input.first().json;\nlet jobId = null;\nlet callbackUrl = null;\ntry { jobId = $('Validate Input').first().json.jobId; } catch (e) {}\ntry { callbackUrl = $('Validate Input').first().json.callbackUrl; } catch (e) {}\n\nconst errPayload = {\n  jobId: jobId,\n  error: {\n    code: 'VIDEO_GENERATION_FAILED',\n    message: data.error_message || 'Video generation failed.',\n    taskId: data.task_id || null,\n  },\n};\n\nreturn [{\n  json: {\n    callbackUrl: callbackUrl,\n    payload: errPayload,\n  }\n}];"
+        "jsCode": "const data = $input.first().json;\nlet jobId = null;\nlet callbackUrl = null;\ntry { jobId = $('Validate Input').first().json.jobId; } catch (e) {}\ntry { callbackUrl = $('Validate Input').first().json.callbackUrl; } catch (e) {}\n\nconst message = (data && data.error_message) ? String(data.error_message).slice(0, 1000) : 'Video generation failed.';\nconst lower = message.toLowerCase();\nlet code = 'VIDEO_GENERATION_FAILED';\nlet metadata = null;\nif (lower.includes('safety check') || lower.includes('rai') || lower.includes('recitation') || lower.includes('blocked')) {\n  code = 'content_safety';\n  const reasons = [];\n  const m = message.match(/safety check(?:\\s*:\\s*)?(.*)$/i);\n  if (m && m[1]) reasons.push(m[1].trim());\n  if (reasons.length) metadata = { raiMediaFilteredReasons: reasons };\n}\n\nconst errPayload = {\n  jobId: jobId,\n  error: {\n    code,\n    message,\n    taskId: data.task_id || null,\n  },\n};\nif (metadata) errPayload.metadata = metadata;\n\nreturn [{\n  json: {\n    callbackUrl: callbackUrl,\n    payload: errPayload,\n  }\n}];"
       },
       "type": "n8n-nodes-base.code",
       "typeVersion": 2,
-      "position": [2080, 720],
+      "position": [
+        2080,
+        720
+      ],
       "id": "node-vid-err",
       "name": "Format Video Error"
     },
@@ -558,138 +941,510 @@
         "sendHeaders": true,
         "headerParameters": {
           "parameters": [
-            { "name": "X-Internal-Token", "value": "={{ $env.INTERNAL_API_KEY }}", "parameterType": "string" }
+            {
+              "name": "X-Internal-Token",
+              "value": "={{ $env.INTERNAL_API_KEY }}",
+              "parameterType": "string"
+            }
           ]
         },
         "sendBody": true,
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify($json.payload) }}",
-        "options": { "timeout": 30000 }
+        "options": {
+          "timeout": 30000
+        }
       },
       "type": "n8n-nodes-base.httpRequest",
       "typeVersion": 4.2,
-      "position": [2320, 720],
+      "position": [
+        2320,
+        720
+      ],
       "id": "node-send-vid-err",
       "name": "Send Video Error",
       "credentials": {
-        "httpHeaderAuth": { "id": "INTERNAL_TOKEN_CRED", "name": "Internal Token (X-Internal-Token)" }
+        "httpHeaderAuth": {
+          "id": "INTERNAL_TOKEN_CRED",
+          "name": "Internal Token (X-Internal-Token)"
+        }
       }
     }
   ],
   "pinData": {},
   "connections": {
     "Webhook - Media Request": {
-      "main": [[{ "node": "Validate Input", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Validate Input",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Validate Input": {
       "main": [
-        [{ "node": "Route by Type", "type": "main", "index": 0 }],
-        [{ "node": "Send Validation Error Callback", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Route by Type",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Validation Error Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Send Validation Error Callback": {
-      "main": [[{ "node": "Ack Validation Error (400)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Ack Validation Error (400)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Route by Type": {
       "main": [
-        [{ "node": "Prepare Image Prompt", "type": "main", "index": 0 }],
-        [{ "node": "Prepare Video Prompt", "type": "main", "index": 0 }],
-        [{ "node": "Send Validation Error Callback", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Prepare Image Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Prepare Video Prompt",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Send Validation Error Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Prepare Image Prompt": {
-      "main": [[{ "node": "Enhance Image Prompt (Gemini)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Enhance Image Prompt (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Enhance Image Prompt (Gemini)": {
-      "main": [[{ "node": "Has Ref Image?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Has Ref Image?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Has Ref Image?": {
       "main": [
-        [{ "node": "Split Refs", "type": "main", "index": 0 }],
-        [{ "node": "Build Image Request", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Split Refs",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Image Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Split Refs": {
-      "main": [[{ "node": "Download Refs", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Download Refs",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Download Refs": {
-      "main": [[{ "node": "Build Image Request", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Image Request",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Image Request": {
-      "main": [[{ "node": "Generate Image (Nano Banana)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Generate Image (Nano Banana)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Generate Image (Nano Banana)": {
-      "main": [[{ "node": "Convert Image to Binary", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Convert Image to Binary",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Convert Image to Binary": {
-      "main": [[{ "node": "PUT Image to MinIO", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "PUT Image to MinIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "PUT Image to MinIO": {
-      "main": [[{ "node": "Prepare Image Callback", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Prepare Image Callback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Image Upload Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Prepare Image Callback": {
-      "main": [[{ "node": "Has Callback?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Has Callback?",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Image Upload Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Image Upload Error": {
+      "main": [
+        [
+          {
+            "node": "Send Image Upload Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Image Upload Error": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Image (202)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Has Callback?": {
-      "main": [[{ "node": "Send Image Callback", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Send Image Callback",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Send Image Callback": {
-      "main": [[{ "node": "Acknowledge Image (202)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Acknowledge Image (202)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Prepare Video Prompt": {
-      "main": [[{ "node": "Enhance Video Prompt (Gemini)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Enhance Video Prompt (Gemini)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Enhance Video Prompt (Gemini)": {
-      "main": [[{ "node": "Has Ref Video?", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Has Ref Video?",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Has Ref Video?": {
       "main": [
-        [{ "node": "Download Video Ref", "type": "main", "index": 0 }],
-        [{ "node": "Build Video Job", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Download Video Ref",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Build Video Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Download Video Ref": {
-      "main": [[{ "node": "Build Video Job", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Build Video Job",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Build Video Job": {
-      "main": [[{ "node": "Submit Video Job (Veo 3.1)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Submit Video Job (Veo 3.1)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Submit Video Job (Veo 3.1)": {
-      "main": [[{ "node": "Extract Task Info", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Extract Task Info",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Extract Task Info": {
-      "main": [[{ "node": "Wait 20s", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Wait 20s",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Wait 20s": {
-      "main": [[{ "node": "Check Video Status", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Check Video Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Check Video Status": {
-      "main": [[{ "node": "Evaluate Video Status", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Evaluate Video Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Evaluate Video Status": {
-      "main": [[{ "node": "Route Video Status", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Route Video Status",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Route Video Status": {
       "main": [
-        [{ "node": "Download Video (GCS)", "type": "main", "index": 0 }],
-        [{ "node": "Wait 20s", "type": "main", "index": 0 }],
-        [{ "node": "Format Video Error", "type": "main", "index": 0 }]
+        [
+          {
+            "node": "Download Video (GCS)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Wait 20s",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Video Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
       ]
     },
     "Download Video (GCS)": {
-      "main": [[{ "node": "PUT Video to MinIO", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "PUT Video to MinIO",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "PUT Video to MinIO": {
-      "main": [[{ "node": "Prepare Video Callback", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Prepare Video Callback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Video Upload Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Prepare Video Callback": {
-      "main": [[{ "node": "Send Video Callback", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Send Video Callback",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Format Video Upload Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Format Video Upload Error": {
+      "main": [
+        [
+          {
+            "node": "Send Video Upload Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Send Video Upload Error": {
+      "main": [
+        [
+          {
+            "node": "Acknowledge Video (202)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Send Video Callback": {
-      "main": [[{ "node": "Acknowledge Video (202)", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Acknowledge Video (202)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     },
     "Format Video Error": {
-      "main": [[{ "node": "Send Video Error", "type": "main", "index": 0 }]]
+      "main": [
+        [
+          {
+            "node": "Send Video Error",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
     }
   },
   "active": true,

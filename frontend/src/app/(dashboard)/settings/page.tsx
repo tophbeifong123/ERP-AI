@@ -5,7 +5,6 @@ import React, { useState, useEffect, Suspense } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Briefcase,
-  Clock,
   Trash2,
   AlertTriangle,
   Loader2,
@@ -15,11 +14,10 @@ import { toast } from 'sonner';
 
 import { useBusinessStore } from '@/hooks/store/use-business-store';
 import { businessService, FacebookPageOption } from '@/core/services/business-service';
-import { CreateBusinessInput, AutoPostConfigInput } from '@/core/validations/business-schema';
+import { CreateBusinessInput } from '@/core/validations/business-schema';
 
 // นำเข้า Onboarding Reusable Components
 import Step1BusinessForm from '@/components/features/onboarding/step1-business-form';
-import Step2PostSettings from '@/components/features/onboarding/step2-post-settings';
 import Step4FbConnection from '@/components/features/onboarding/step4-fb-connection';
 
 function SettingsContent() {
@@ -32,7 +30,7 @@ function SettingsContent() {
     setActiveBusinessId
   } = useBusinessStore();
 
-  const [activeTab, setActiveTab] = useState<'profile' | 'autopost' | 'facebook' | 'danger'>('profile');
+  const [activeTab, setActiveTab] = useState<'profile' | 'facebook' | 'danger'>('profile');
   const [loading, setLoading] = useState(false);
 
   // สำหรับการลบธุรกิจ (Danger Zone)
@@ -125,22 +123,6 @@ function SettingsContent() {
     } catch (err) {
       const axiosError = err as { response?: { data?: { message?: string } } };
       toast.error(axiosError.response?.data?.message || 'เกิดข้อผิดพลาดในการบันทึกข้อมูล');
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  // --- Submit 2: Update AutoPost Config ---
-  const handleUpdateAutoPost = async (data: AutoPostConfigInput) => {
-    if (!activeBusinessId) return;
-    setLoading(true);
-    try {
-      await businessService.updateAutoPostConfig(activeBusinessId, data);
-      await fetchBusinesses();
-      toast.success('อัปเดตการตั้งค่าการโพสต์อัตโนมัติสำเร็จแล้ว');
-    } catch (err) {
-      const axiosError = err as { response?: { data?: { message?: string } } };
-      toast.error(axiosError.response?.data?.message || 'ไม่สามารถบันทึกตารางการตั้งค่าได้');
     } finally {
       setLoading(false);
     }
@@ -261,7 +243,6 @@ function SettingsContent() {
         {(
           [
             { key: 'profile', l: 'ข้อมูลทั่วไปธุรกิจ', icon: Briefcase },
-            { key: 'autopost', l: 'ระบบโพสต์อัตโนมัติ', icon: Clock },
             { key: 'facebook', l: 'เชื่อมต่อ Facebook Page', icon: Settings },
             { key: 'danger', l: 'Danger Zone (ลบธุรกิจ)', icon: Trash2 },
           ] as const
@@ -309,28 +290,6 @@ function SettingsContent() {
                 keywords: activeBusiness.keywords || [],
               }}
               defaultLogoUrl={activeBusiness.logo?.publicUrl || null}
-            />
-          </div>
-        )}
-
-        {/* Tab 2: AutoPost Settings (Reuse Step2PostSettings) */}
-        {activeTab === 'autopost' && activeBusiness && (
-          <div className="space-y-4">
-            <div className="mb-4">
-              <h2 className="text-lg font-bold text-foreground">กำหนดพฤติกรรมการตัดสินใจของ AI</h2>
-              <p className="text-xs text-muted-foreground">สลับความถี่และตั้งตารางเวลาทำงานสำหรับการส่งโพสต์อัตโนมัติ</p>
-            </div>
-            <Step2PostSettings
-              onSubmit={handleUpdateAutoPost}
-              loading={loading}
-              hideBack={true}
-              defaultValues={{
-                enabled: activeBusiness.autoPostEnabled,
-                mode: activeBusiness.autoPostMode || 'ai_decide',
-                postsPerWeekTarget: activeBusiness.postsPerWeekTarget,
-                minGapDays: activeBusiness.minGapDays,
-                fixedScheduleRules: activeBusiness.fixedScheduleRules || [],
-              }}
             />
           </div>
         )}

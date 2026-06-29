@@ -15,11 +15,7 @@ import {
 } from '@nestjs/common';
 import { FileInterceptor } from '@nestjs/platform-express';
 import { BusinessesService } from './businesses.service';
-import {
-  CreateBusinessDto,
-  UpdateAutoPostDto,
-  UpdateBusinessDto,
-} from './dto/business.dto';
+import { CreateBusinessDto, UpdateBusinessDto } from './dto/business.dto';
 import { OwnerGuard } from '../../common/guards/owner.guard';
 import { EmailVerifiedGuard } from '../../common/guards/email-verified.guard';
 import { CurrentUser } from '../../common/decorators/current-user.decorator';
@@ -95,16 +91,5 @@ export class BusinessesController {
     }
     const saved = await this.businessesService.uploadLogo(id, userId, file);
     return { file: saved };
-  }
-
-  @Patch(':id/auto-post')
-  @UseGuards(OwnerGuard)
-  @ResourceType('business')
-  async updateAutoPost(
-    @Param('id', new ParseUUIDPipe()) id: string,
-    @Body() dto: UpdateAutoPostDto,
-  ) {
-    const business = await this.businessesService.updateAutoPost(id, dto);
-    return { business };
   }
 }
