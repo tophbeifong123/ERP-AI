@@ -1,36 +1,59 @@
 # ERP-AI — Quick Start (Demo Flow)
 
+อัปเดตล่าสุด: มิถุนายน 2026 — ระบบหลักทำงานครบทุก flow แล้ว (register → onboard → create AI post → approve → cron posts to FB)
+
 ## TL;DR
 
 ```bash
-# 1. From the repo root
-docker compose up -d            # postgres, redis, minio, mailhog, n8n, ai-services
-cd backend/server && CI=true pnpm install
-CI=true pnpm migration:run
-# Start backend (in a terminal that you can leave running)
-node dist/main.js              # http://localhost:3000
+# 0. Prerequisites (one-time)
+#    - Node 20+ with pnpm
+#    - Docker with `docker compose`
 
-# 2. In another terminal
-cd frontend && CI=true pnpm install
-./node_modules/.bin/next dev -p 3001   # http://localhost:3001
+# 1. From the repo root: start infrastructure
+docker compose up -d            # postgres, redis, minio, mailhog, n8n, ai-services
+
+# 2. Backend (NestJS)
+cd backend/server
+CI=true pnpm install
+CI=true pnpm migration:run
+# Option A — production-style run
+node dist/main.js              # http://localhost:3000
+# Option B — dev with auto-reload
+pnpm start:dev                 # nest start --watch, port 3000
+
+# 3. Frontend (Next.js) — in another terminal
+cd ../frontend
+CI=true pnpm install
+pnpm dev -- -p 3001            # http://localhost:3001
+# (modern pnpm form; older `./node_modules/.bin/next dev -p 3001` also works)
 ```
 
-Open **http://localhost:3001** → register → verify email (Mailhog :8025) → complete the 3-step onboarding → click "สร้างโพสต์ด้วย AI" on the dashboard.
+Open **http://localhost:3001** → register → verify email (Mailhog at **http://localhost:8025**) → complete the 3-step onboarding → click "**สร้างโพสต์ด้วย AI**" on the dashboard.
+
+### Demo credentials (already seeded)
+
+If you don't want to register a fresh account, the dev DB has a pre-seeded user:
+
+| Field | Value |
+|---|---|
+| Email | `demo@erp-ai.test` |
+| Password | `Test1234!` |
+
+(Log in at http://localhost:3001/login.) This account already has a business + a connected Facebook Page, so you can go straight to creating posts.
 
 ## What happens when you "Generate post"
 
-1. **User** types a short hint + picks services on the dashboard
-2. **Backend** creates a `Post` in `generating` state and enqueues **4 AI jobs in parallel**:
-   - `caption` → Groq generates a Thai caption from the hint
-   - `image` → n8n generates an image and uploads to MinIO
-   - `short_video` → optional (n8n)
-   - `decision` → Groq recommends a publish time
-3. **Frontend** polls every 3s while any post is `generating`; user sees the badge change
-4. When **all 4 jobs succeed** → post transitions to `pending_approval`
-5. **User** can edit caption / scheduled time / post type / services (**NOT the image**)
-6. **User** clicks "อนุมัติ" → status becomes `approved`
-7. **Cron** (`dispatchDuePosts`, every minute) picks up approved posts whose `scheduledAt <= now` and posts to Facebook
-8. **Cron** (`expirePendingApprovals`, every minute) marks `pending_approval` posts whose `approvalDeadline` passed as `expired`
+1. **User** opens the modal → types a short hint + picks `postType` + picks **`mediaType` (image หรือ short_video, default = image)** + optional featured services
+2. **Backend** creates a `Post` in `generating` state, persists the chosen `mediaType`, and enqueues **3 AI jobs in parallel**:
+   - `caption` → `ai-services` (Groq) generates a Thai caption from the hint
+   - `media` (image หรือ short_video ตามที่ผู้ใช้เลือก) → `n8n` workflow สร้างสื่อ แล้วอัปโหลดเข้า MinIO
+   - `decision` → `ai-services` (Groq) recommends a publish time
+3. **Frontend** polls `/posts` every 3s while any post is `generating`; user sees an in-flight placeholder ("กำลังสร้างรูปภาพ…" หรือ "กำลังสร้างวิดีโอ…")
+4. When **all 3 jobs succeed** → post transitions to `pending_approval`
+5. **User** can edit `caption` / `scheduledAt` / `postType` / `featuredServiceIds` (**ไม่สามารถ regenerate สื่อได้ในเวอร์ชันนี้**)
+6. **User** clicks "**อนุมัติ**" → status becomes `approved`
+7. **Cron** `dispatchDuePosts` (every 1 min) picks up `approved` posts whose `scheduledAt <= now` → dispatches to Facebook via the Graph API
+8. **Cron** `expirePendingApprovals` (every 1 min) marks `pending_approval` posts past their `approvalDeadline` as `expired`
 
 ## Architecture
 
@@ -42,34 +65,42 @@ Open **http://localhost:3001** → register → verify email (Mailhog :8025) →
 └──────────────┘       │  + 2 crons       │       ┌──────────────┐
                        │                 │       │   MinIO      │
                        │   POST /posts    │       │   :9000      │
-                       │   enqueues 4 AI  │       └──────────────┘
-                       │   jobs           │       ┌──────────────┐
-                       └────┬────────────┘       │  AI Services │
-                            │                    │  :8000       │
-                            │  async callbacks   │  Decision +   │
-                            ▼                    │  Caption     │
-                  ┌─────────────────┐             └──────┬───────┘
-                  │  AI Services     │◄─────────────────►│
-                  │  + n8n (:5678)   │                    │
-                  │  (n8n calls       │                    │
-                  │   MinIO via       │                    │
-                  │   host.docker.    │                    │
-                  │   internal)       │                    │
+                       │   enqueues 3 AI  │       │ (S3-compat)  │
+                       │   jobs           │       └──────────────┘
+                       └────┬────────────┘       ┌──────────────┐
+                            │                    │  AI Services │
+                            │  async callbacks   │  :8000       │
+                            ▼                    │  (FastAPI)   │
+                  ┌─────────────────┐             │  Decision +   │
+                  │  AI Services     │◄────────────│  Caption     │
+                  │  + n8n (:5678)   │  HTTP       │  (Groq)      │
+                  │  (n8n calls       │             └──────────────┘
+                  │   MinIO via       │
+                  │   presigned URL + │
+                  │   GCS for Veo)   │
                   └─────────────────┘
 
-Async contract:
-  Backend ──POST /recommend-time──► AI Services
-  AI Services ──202 Accepted──────► Backend
-  AI Services ──POST /internal/ai/decision/callback──► Backend (with result)
+Sync:    Backend ──POST /api/ai/decision, /api/ai/caption──► AI Services
+                AI Services ──202 Accepted─────────────────► Backend
+        Backend ──POST /webhook/generate-media (X-Internal-Token)──► n8n
+
+Async (callback):
+  AI Services ──POST /internal/ai/{decision|caption}/callback──► Backend
+  n8n ──POST /internal/ai/{image|short_video}/callback──────────► Backend
 ```
 
 ## Prerequisites
 
-- Docker (or Podman) with `docker compose`
-- Node 20+ and pnpm
-- A **Groq API key** at https://console.groq.com — required for AI Caption + Decision
-- A Facebook App with `pages_show_list`, `pages_manage_posts`, `pages_read_engagement` scopes
-- (For image generation via n8n) Google Cloud credentials for Vertex AI / Veo3
+- **Docker** (or Podman) with `docker compose`
+- **Node.js 20+** and **pnpm**
+- A **Groq API key** at https://console.groq.com — required for AI Caption + AI Decision
+- A Facebook App with `pages_show_list`, `pages_manage_posts`, `pages_read_engagement` scopes — required for the FB OAuth flow
+- **(Optional, for AI media)** A Google Cloud service account with Vertex AI access:
+  - Set `GCP_PROJECT_ID`, `GCP_LOCATION`, `GCP_VEO_OUTPUT_BUCKET` in `backend/server/.env`
+  - Place the service account JSON at `/mnt/d/work/ERP-AI/gcp-key.json` (template at `gcp-key.json.example`)
+  - Set `ENABLE_AI_MEDIA=true` to actually generate image/short_video
+  - Make the GCS bucket public-read (run `python3 scripts/make_bucket_public.py`)
+  - Without these, the media job is skipped and only caption+decision run
 
 ## Environment files
 
@@ -79,7 +110,7 @@ Async contract:
 | `/mnt/d/work/ERP-AI/backend/server/.env` | Backend reads directly |
 | `/mnt/d/work/ERP-AI/frontend/.env` (optional) | `NEXT_PUBLIC_API_URL=...` |
 
-All `.env` files are git-ignored; only `.env.example` is committed.
+All `.env` files are git-ignored; only `.env.example` is committed. `gcp-key.json` is also git-ignored (template at `gcp-key.json.example`).
 
 ## Important: Docker networking on WSL2
 
@@ -97,7 +128,7 @@ hostname -I        # e.g. 172.27.65.121
 
 1. Open http://localhost:9001 (minioadmin / minioadmin)
 2. Create bucket: `erp-ai`
-3. Set access policy to `public` (so the Facebook Graph API can fetch the image)
+3. Set access policy to `public` (so n8n can upload to it via presigned URL)
 
 If you can't do this, run:
 ```bash
@@ -105,17 +136,17 @@ docker exec erp-ai-minio mc alias set local http://localhost:9000 minioadmin min
 docker exec erp-ai-minio mc anonymous set download local/erp-ai
 ```
 
-## Demo without GCP (text-only image)
+## Demo without GCP (text-only)
 
-If n8n can't reach Vertex AI / Veo3 (no `GCP_PROJECT_ID` / `GCP_VEO_OUTPUT_BUCKET`), the image job will fail after 3 retries and the post will be marked `failed`. For a quick text-only demo, edit `backend/server/src/modules/posts/posts.service.ts:enqueueFullAIPipeline()` and remove the two media jobs (`image` + `short_video`).
+If n8n can't reach Vertex AI / Veo 3.1 (no `GCP_PROJECT_ID` / `GCP_VEO_OUTPUT_BUCKET`), set `ENABLE_AI_MEDIA=false` in `backend/server/.env` and restart. The post will finalize with just caption + decision (no media); the in-flight placeholder will be skipped, and the post will go straight to `pending_approval` with no thumbnail.
 
 ## Cron summary
 
 | Cron | When | What |
 |---|---|---|
-| `dispatchDuePosts` | every 1 min | Posts with `status='approved' AND scheduledAt <= now` → FB |
+| `dispatchDuePosts` | every 1 min | Posts with `status='approved' AND scheduledAt <= now` → FB (multipart upload of file bytes from MinIO) |
 | `expirePendingApprovals` | every 1 min | `pending_approval` posts past their `approvalDeadline` → `expired` |
-| `ai-job-retry` | every 30s | Re-enqueues failed AI jobs (with backoff 1m, 5m, 15m) |
+| `ai-job-retry` (BullMQ delayed) | at +1m / +5m / +15m | Re-enqueues failed AI jobs with exponential backoff |
 
 ## Where things live
 
@@ -131,12 +162,15 @@ If n8n can't reach Vertex AI / Veo3 (no `GCP_PROJECT_ID` / `GCP_VEO_OUTPUT_BUCKE
 
 ## What's been refactored
 
-This is the simplified version of the project. The previous auto-decide and auto-schedule flows have been removed. See `docs/REFACTOR.md` (if it exists) for the full changelog. Key changes:
+This is the simplified version of the project. The previous auto-decide and auto-schedule flows have been removed. See `docs/PROGRESS.md` for the full changelog. Key changes from the original spec:
 
 - `content-plans` table and module — **removed**
 - `auto_post_*` columns on `businesses` — **removed**
 - `dailyDecide` and `materializeFixedSchedule` crons — **removed**
 - `SchedulerService` — slimmed to just `dispatchDuePosts` + `expirePendingApprovals`
-- `POST /posts` — new shape: `{ businessId, hint, postType, featuredServiceIds }` (no caption/fbPageId)
+- `POST /posts` — new shape: `{ businessId, hint, postType, mediaType, featuredServiceIds }` (no caption/fbPageId; `mediaType` is the new field, defaults to `image`)
 - `POST /internal/ai/decision/callback` — new route with new contract: `{ jobId, result: { suggestedScheduledAt, reasoning } }`
 - AI Decision service — rewrote as a "time recommender" (not "should-post" decider)
+- `posts.media_type` enum column — added 2026-06; persists the user's media choice per post
+- `ai_jobs.metadata` jsonb + `ai_jobs.error_code` — added 2026-06; structured storage for failure context (e.g. RAI filter reasons)
+- `DispatchPostProcessor` — switched from URL-based to multipart upload 2026-06 so Facebook doesn't need to fetch a private URL

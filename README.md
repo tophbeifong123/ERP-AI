@@ -1,22 +1,21 @@
 # ERP-AI
 
-> **หมายเหตุ**: โครงการนี้อยู่ระหว่างการพัฒนา (WIP / MVP) — คุณสมบัติบางส่วนที่อธิบายในเอกสารนี้ยังไม่ได้ถูกนำไปใช้งานจริง
-
 แพลตฟอร์มการตลาดบน Facebook ที่ขับเคลื่อนด้วย AI สำหรับวิสาหกิจขนาดกลางและขนาดย่อม (SMEs) — ลงทะเบียน สร้างธุรกิจ แล้วให้ AI ตัดสินใจสร้างและจัดตารางโพสต์ให้ทุกวันเวลา 06:00 น. พร้อมรอการอนุมัติจากผู้ใช้ก่อนเผยแพร่จริง
+
+> **สถานะ (มิถุนายน 2026):** ระบบหลักใช้งานได้จริงตามที่อธิบายในเอกสาร — ผู้ใช้สามารถสมัคร, สร้างธุรกิจ, เชื่อม Facebook Page, สร้างโพสต์ด้วย AI (เลือก image หรือ short_video), อนุมัติ และให้ cron โพสต์ขึ้น Facebook ได้ ฟีเจอร์ที่เหลือใน TODO ดูได้ที่ [docs/PROGRESS.md](./docs/PROGRESS.md)
 
 ---
 
 ## 🚀 โครงสร้างโปรเจกต์ (Project Structure)
 
-โปรเจกต์นี้ถูกออกแบบในรูปแบบ Monorepo / Multi-service ประกอบด้วย Frontend ที่พัฒนาแล้ว, Backend พร้อมบริการ AI ที่อยู่ระหว่างการวางแผน:
+โปรเจกต์นี้ถูกออกแบบในรูปแบบ Monorepo / Multi-service:
 
-- **`frontend/`** — ส่วนเว็บแอปพลิเคชันสำหรับผู้ใช้ (Next.js, TypeScript, React 19)
-- **`backend/server/`** — บริการ Backend API (NestJS, TypeORM, PostgreSQL, BullMQ + Redis)
+- **`frontend/`** — ส่วนเว็บแอปพลิเคชันสำหรับผู้ใช้ (Next.js 16 App Router, TypeScript, React 19, Tailwind v4)
+- **`backend/server/`** — บริการ Backend API (NestJS, TypeORM, PostgreSQL, BullMQ + Redis, JWT auth, MinIO/S3)
+- **`ai-services/`** — บริการ AI ภายใน (FastAPI + Groq) สำหรับ Decision + Caption — เปิดใช้งานจริงแล้ว
+- **`n8n/`** — workflow เดียวที่ใช้สร้างสื่อภาพ/วิดีโอ (image ผ่าน Gemini/Nano Banana, short_video ผ่าน Veo 3.1) — ทำงานบน [n8n](https://n8n.io/) ที่ spawn ผ่าน Docker
 - **`docs/`** — เอกสารทั้งหมด (ภาษาไทย) รวมถึง contract สำหรับทีม AI และ Frontend
-- **AI services (ภายนอก)** — 3 บริการที่ Backend เรียกผ่าน HTTP:
-  - **AI Decision Service** — ตัดสินใจว่าจะโพสต์วันนี้หรือไม่ + เลือกเวลา
-  - **AI Caption Service** — สร้างแคปชั่นภาษาไทย
-  - **AI Media Service** — สร้างภาพ/วิดีโอสั้น
+- **`scripts/`** — utility scripts (เช่น `make_bucket_public.py` สำหรับ GCS)
 
 ---
 
@@ -225,17 +224,24 @@ backend/server/src/
 - ถ้า `shouldPost: true` → สร้าง post + enqueue caption + media jobs
 
 ### 6. การสร้างเนื้อหาด้วย AI
-- Backend เรียก **AI Caption Service** เพื่อสร้างข้อความ (ภาษาไทย)
-- Backend เรียก **AI Media Service** เพื่อสร้างสื่อ (image หรือ short_video ≤ 15 วินาที)
-  - **Backend ออก Presigned URL ให้ AI ใช้อัปโหลด** เข้า MinIO โดยตรง (AI ไม่ต้องมี MinIO credentials)
+- Backend เรียก **AI Caption Service** (FastAPI + Groq) เพื่อสร้างข้อความ (ภาษาไทย)
+- Backend เรียก **n8n workflow** (HTTP webhook) เพื่อสร้างสื่อ:
+  - **image** → Google Gemini 2.5 Flash (ขยาย prompt) → Nano Banana `gemini-3.1-flash-image` (สร้างภาพ)
+  - **short_video** → Google Gemini 2.5 Flash (ขยาย prompt) → Veo 3.1 long-running operation (สร้างวิดีโอ)
+  - **ผู้ใช้เลือก** image หรือ short_video ตอนสร้างโพสต์ (default = image) — ไม่ generate ทั้งสองอย่างพร้อมกัน
+  - **Backend ออก MinIO presigned URL** ให้ n8n ใช้อัปโหลดไฟล์เข้า MinIO โดยตรง (n8n ไม่ต้องมี MinIO credentials)
+  - **สถานะสื่อถูกควบคุมด้วย `ENABLE_AI_MEDIA`** env (default = `false` → ไม่ generate media, เปิด `true` เพื่อ generate ตาม mediaType ที่ผู้ใช้เลือก)
 - นโยบายการลองใหม่: **3 ครั้ง, exponential backoff (1m, 5m, 15m)**, จากนั้น mark `failed` + email แจ้ง user
-- บันทึกโพสต์เป็น `pending_approval`
+- หลัง media เสร็จ Backend เก็บ `PostMedia.kind` และ file URL ใน `post_media` + `files`
+- เมื่อทั้ง 3 AI jobs (caption + media + decision) สำเร็จ → post → `pending_approval`
 - **รองรับ image หรือ short_video** ต่อโพสต์ (1 สื่อต่อโพสต์ ไม่มี carousel ใน MVP)
+- **Recap**: n8n callback payload มี `errorCode` + `metadata` (เช่น RAI filter reasons) เพื่อให้ backend เก็บเป็น structured data ใน `ai_jobs`
 
 ### 7. การสร้างโพสต์ด้วยตนเอง
 - ปุ่ม "สร้างโพสต์" ใช้ได้เสมอ (แม้ auto-post ปิด)
 - ส่งข้อมูลผ่านฟอร์ม:
   - `postType`: `promotion` | `product_showcase` | `brand_awareness` | `event`
+  - **`mediaType`: `image` | `short_video`** (default = `image`) — เลือกได้ใน UI ตอนสร้างโพสต์
   - `featuredServiceIds[]` (optional)
   - `captionHint` (optional)
   - `scheduleAt` (optional — ถ้าไม่ระบุ AI จะเลือกเวลาให้)
@@ -383,11 +389,11 @@ PostgreSQL entities (TypeORM) — ดู schema ฉบับเต็ม: [`docs
 
 | Phase | ขอบเขต | สถานะ |
 |---|---|---|
-| **P0** | Authentication, Business, Logo, File storage | ⏳ |
-| **P1** | Facebook OAuth, เชื่อมต่อเพจ, โพสต์ด้วยตนเอง (ไม่มี AI) | ⏳ |
-| **P2** | AI Caption + AI Media, ขั้นตอนอนุมัติ, อีเมล | ⏳ |
-| **P3** | Daily AI decide, fixed schedule, cron dispatcher, auto-reject | ⏳ |
-| **P4** | ตกแต่ง, error handling, observability, retry policy, metrics | ⏳ |
+| **P0** | Authentication, Business, Logo, File storage | ✅ เสร็จ |
+| **P1** | Facebook OAuth, เชื่อมต่อเพจ, โพสต์ด้วยตนเอง (ไม่มี AI) | ✅ เสร็จ |
+| **P2** | AI Caption + AI Media, ขั้นตอนอนุมัติ, อีเมล | ✅ เสร็จ (media ต้องตั้ง `ENABLE_AI_MEDIA=true` ใน backend `.env`) |
+| **P3** | Daily AI decide, fixed schedule, cron dispatcher, auto-reject | ✅ เสร็จ |
+| **P4** | ตกแต่ง, error handling, observability, retry policy, metrics | ✅ เสร็จ (มี health endpoint, request ID, Bull Board) |
 
 ---
 
@@ -395,10 +401,29 @@ PostgreSQL entities (TypeORM) — ดู schema ฉบับเต็ม: [`docs
 
 - ❌ Multi-user collaboration ในธุรกิจเดียว
 - ❌ Carousel (หลายภาพ/วิดีโอต่อโพสต์)
-- ❌ Image/Video regeneration ในแอป
+- ❌ Image/Video regeneration ในแอป (ต้องสร้างโพสต์ใหม่)
 - ❌ Multiple Facebook pages ต่อธุรกิจ (เลือกได้แค่ 1)
 - ❌ Instagram / TikTok integration
 - ❌ Push notification (เฉพาะ email)
-- ❌ WebSocket real-time (ใช้ polling)
+- ❌ WebSocket real-time (ใช้ polling 3 วินาที)
 - ❌ Multi-language (เฉพาะไทย)
 - ❌ Currency อื่นที่ไม่ใช่ THB
+
+---
+
+## ⚙️ Environment Variables ที่ควรรู้
+
+### Backend (`backend/server/.env`)
+
+| Key | ค่าเริ่มต้น | คำอธิบาย |
+|---|---|---|
+| `ENABLE_AI_MEDIA` | `false` | ตั้งเป็น `true` เพื่อ generate image / short_video ผ่าน n8n + Vertex AI (ต้องมี GCP service account) |
+| `S3_PRESIGN_ENDPOINT` | `http://minio:9000` | Endpoint ที่ใช้ใน presigned URL สำหรับ MinIO (n8n ใช้ upload ผ่าน URL นี้) |
+| `GCP_PROJECT_ID` | — | Google Cloud project ที่ใช้ Vertex AI (ต้องตั้งถ้าเปิด `ENABLE_AI_MEDIA`) |
+| `GCP_VEO_OUTPUT_BUCKET` | — | GCS bucket ที่ Veo 3.1 เขียนวิดีโอลง (ต้องเป็น public read หรือ sign URL) |
+| `APP_URL` | `http://localhost:3000` | URL ที่ n8n ใช้เรียก callback กลับมาที่ backend (ถ้ารันบน WSL ให้ตั้งเป็น IP ของ WSL) |
+
+### Security
+
+- **`gcp-key.json` ไม่ถูก commit ลง repo** — มี `.gitignore` และ template อยู่ที่ `gcp-key.json.example` (อย่าลืม rotate key ถ้าเคย leak)
+- ดู [docs/00-INDEX.md](./docs/00-INDEX.md) สำหรับ contract ของแต่ละทีม

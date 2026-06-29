@@ -1,8 +1,10 @@
 # Contract: AI Media Service (Image + Short Video)
 
-> สำหรับทีม **ai-generate-media dev**
+> สำหรับทีม **ai-generate-media dev** (หรือทีมที่ดูแล n8n workflow)
 > เอกสารนี้อธิบาย API contract ระหว่าง Backend ↔ AI Media Service
 > Media Service รับผิดชอบทั้ง **image** และ **short_video** ใน MVP
+>
+> **อัปเดตล่าสุด (มิ.ย. 2026):** ระบบจริงใช้ **n8n workflow** เป็น media service ไม่ใช่ standalone HTTP service — contract นี้ยังเป็น schema จริง (เพราะ n8n ใช้ schema นี้กับ Vertex AI โดยตรง) แต่ flow คือ: **Backend → n8n webhook → Vertex AI → MinIO** แทนที่จะเป็น **Backend → AI service → MinIO**
 
 ---
 
@@ -14,14 +16,16 @@ AI Media Service มีหน้าที่สร้าง **สื่อภา
 
 ```
 ┌──────────────┐                              ┌──────────────────────┐
-│   Backend    │ ─── POST /generate/image ───▶ │                      │
-│   (NestJS)   │ ─── POST /generate/short_video▶│ AI Media Service     │
-│              │                              │  (any stack)         │
+│   Backend    │ ── POST /webhook/generate-media──▶│  n8n workflow     │
+│   (NestJS)   │  (X-Internal-Token)          │  (AI Media Service) │
 │              │                              │                      │
-│              │                              │  1. สร้าง image/video │
-│              │                              │  2. PUT → MinIO       │
+│              │                              │  1. Submit Veo/GenAI │
+│              │                              │     long-running op  │
+│              │                              │  2. Poll until done  │
+│              │                              │  3. Download from    │
+│              │                              │     GCS public URL   │
+│              │                              │  4. PUT → MinIO       │
 │              │                              │     (presigned URL)  │
-│              │                              │                      │
 │              │ ◀── POST callback ─────────  │                      │
 └──────────────┘     ┌────────────────┐        └──────────────────────┘
                      │   MinIO / S3   │
@@ -29,18 +33,41 @@ AI Media Service มีหน้าที่สร้าง **สื่อภา
                      └────────────────┘
 ```
 
+### 0. Enable/disable media generation
+
+Media generation is **off by default**. Backend reads `ENABLE_AI_MEDIA` from `backend/server/.env`:
+
+- `ENABLE_AI_MEDIA=false` (default) — Backend enqueues only `caption` + `decision` jobs. Post finalizes with no thumbnail. Suitable for dev without GCP.
+- `ENABLE_AI_MEDIA=true` — Backend enqueues the `image` **or** `short_video` job based on `posts.mediaType` (user's choice). Requires:
+  - `GCP_PROJECT_ID` (Vertex AI project)
+  - `GCP_LOCATION` (e.g. `us-central1`)
+  - `GCP_VEO_OUTPUT_BUCKET` (GCS bucket where Veo 3.1 writes; must be `publicAccessPrevention=inherited` + `allUsers=objectViewer` — run `python3 scripts/make_bucket_public.py`)
+  - `gcp-key.json` at repo root (service account with Vertex AI User role)
+
 ---
 
 ## 1. Endpoint ที่ AI ต้องเปิด
 
 ```
-POST <AI_MEDIA_URL>/generate/image
-POST <AI_MEDIA_URL>/generate/short_video
+POST <AI_MEDIA_URL>/generate-media
 ```
 
-**Base URL** เช่น `https://ai-media.example.com`
+**Single endpoint** (เดิมสเปกมีสอง endpoint แยก image/short_video แต่ระบบจริงใช้ endpoint เดียว — n8n เราจ์จาก `body.type` ใน payload)
 
-**Authentication:** Header `X-Internal-Token: <shared secret>`
+**Base URL** เช่น `http://n8n:5678/webhook` ใน Docker, หรือ `http://localhost:5678/webhook` ใน dev
+
+**Authentication:** Header `X-Internal-Token: <shared secret>` (env `INTERNAL_API_KEY` ใน n8n และ backend)
+
+---
+
+## 1.1 Media type selector (ผู้ใช้เลือกเอง)
+
+- `posts.mediaType` enum: `image` | `short_video` (default `image`)
+- ผู้ใช้เลือกตอนสร้างโพสต์ผ่าน `CreatePostModal` ใน frontend
+- Backend enqueue media job เพียง **1 อย่าง** ตามค่านี้ (ไม่ generate ทั้งคู่)
+- Frontend แสดง in-flight placeholder ตาม mediaType:
+  - `image` → "กำลังสร้างรูปภาพ…"
+  - `short_video` → "กำลังสร้างวิดีโอ…"
 
 ---
 
@@ -225,7 +252,32 @@ X-Request-Id: <uuid>           (optional)
 | `rate_limited` | เกิน rate limit | ✅ |
 | `generation_failed` | Model ไม่สามารถ generate ได้ | ✅ (≤ 2 ครั้ง) |
 | `content_policy` | Output ถูก block | ❌ |
-| `upload_failed` | อัปโหลดไฟล์ไม่สำเร็จ (เช่น presigned URL หมดอายุ) | ✅ |
+| `content_safety` | Vertex AI block ด้วย RAI check (เช่น recitation) | ❌ |
+| `upload_failed` | อัปโหลดไฟล์ไม่สำเร็จ (เช่น presigned URL หมดอายุ หรือ GCS download 401) | ✅ |
+
+### 3.3 กรณี Error + structured metadata (มิ.ย. 2026)
+
+ตั้งแต่ มิ.ย. 2026 AI สามารถส่ง `metadata` (jsonb) เพิ่มเติมเพื่อให้ backend เก็บ structured failure context:
+
+```json
+{
+  "jobId": "5d4e3f2a-1b0c-4d3e-5f6a-7b8c9d0e1f2a",
+  "error": {
+    "code": "content_safety",
+    "message": "Content was filtered by Vertex AI safety check: Recitation check failed."
+  },
+  "metadata": {
+    "raiMediaFilteredCount": 0,
+    "raiMediaFilteredReasons": ["Recitation check failed."]
+  }
+}
+```
+
+Backend เก็บ `metadata` ลง `ai_jobs.metadata` (jsonb) เพื่อให้ admin/dev ตรวจสอบย้อนหลังได้ โดยไม่ต้อง parse จาก `lastError` string
+
+ตัวอย่างเพิ่มเติม:
+- `content_safety` + `metadata.raiMediaFilteredReasons`: ใช้โดย Veo 3.1 (recitation check)
+- `upload_failed` + `metadata.httpCode` + `metadata.url`: ใช้โดย MinIO PUT failures (จะเพิ่มในอนาคต)
 
 ---
 

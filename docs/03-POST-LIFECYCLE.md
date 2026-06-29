@@ -1,6 +1,7 @@
 # 03. Post Lifecycle (วงจรชีวิตของโพสต์)
 
 > เอกสารนี้อธิบาย state machine ของ `posts.status` และ transitions ที่อนุญาต
+> อัปเดตล่าสุด: มิถุนายน 2026 (เพิ่ม `mediaType`, `failed → pending_approval` revive logic, `posts.errorCode`)
 
 ---
 
@@ -15,13 +16,13 @@
                           ┌────────────┐
               ┌──────────▶│ generating │◀─────────────┐
               │           └──────┬─────┘              │
-              │ regenerate*     │ media+caption ok   │
-              │ (no MVP)        │                    │
+              │ regenerate*     │ caption + media    │
+              │ (no MVP)        │ callback success   │
               │                 ▼                    │
               │          ┌────────────────┐          │
               │  ┌──────▶│pending_approval│◀─────────┘
-              │  │       └─┬──────┬───────┘
-              │  │         │      │ approve
+              │  │       └─┬──────┬───────┘    (revive from failed:
+              │  │         │      │ approve    retry succeeded)
               │  │         │      ▼
               │  │         │  ┌──────────┐    ┌────────┐
               │  │         │  │ approved │───▶│ posted │
@@ -39,10 +40,12 @@
               │  └───│ rejected │  │ expired │
               │      └──────────┘  └─────────┘
               │
-              │   ┌──────────┐
-              └──▶│  failed  │ (3 retries exhausted)
-                  └──────────┘
+              │   ┌──────────┐        ┌──────────────────┐
+              └──▶│  failed  │───────▶│ (retry succeeds) │
+                  └──────────┘        └──────────────────┘
 ```
+
+หมายเหตุ: เส้นทาย `--▶│ failed │───────▶ (retry succeeds) ───▶│ pending_approval │` คือ **revive logic**: ถ้า post ถูก mark เป็น `failed` (เช่น ครั้งแรก GCS โหลดไฟล์ไม่ได้) แต่ media job retry สำเร็จในภายหลัง Backend `checkPostGenerationComplete()` จะ clear `errorCode/errorMessage` แล้ว transition post กลับเป็น `pending_approval` โดยอัตโนมัติ
 
 ---
 
@@ -51,13 +54,30 @@
 | Status | ความหมาย | ใครเป็นคน set |
 |---|---|---|
 | `draft` | internal — ใช้ตอนสร้าง post แต่ยังไม่ enqueue AI | Backend (manual create) |
-| `generating` | AI กำลังสร้าง caption/รูป/คลิป | Backend (หลัง enqueue jobs) |
-| `pending_approval` | รอ user อนุมัติ | Backend (หลัง media+caption callback) |
+| `generating` | AI กำลังสร้าง caption/media/decision | Backend (หลัง enqueue jobs) |
+| `pending_approval` | รอ user อนุมัติ | Backend (หลัง media+caption callback) — **หรือ** หลัง revive |
 | `approved` | user อนุมัติแล้ว รอเวลาโพสต์ | User (POST /posts/{id}/approve) |
 | `posted` | โพสต์ไป Facebook สำเร็จ | Backend (dispatch cron) |
 | `rejected` | user ปฏิเสธ | User (POST /posts/{id}/reject) |
 | `expired` | ไม่อนุมัติทันเวลา | Backend (expire cron) |
-| `failed` | AI job fail 3 ครั้ง / Facebook API fail 3 ครั้ง | Backend (retry exhausted) |
+| `failed` | AI job fail 3 ครั้ง / Facebook API fail 3 ครั้ง | Backend (retry exhausted) — **revive ได้** ถ้า retry ต่อไปสำเร็จ |
+
+### 2.1 เพิ่มเติม: `posts.mediaType` (ถูกเพิ่ม มิ.ย. 2026)
+
+- **enum** `image` | `short_video` (default `image`)
+- ผู้ใช้เลือกตอนสร้างโพสต์ผ่าน modal (`CreatePostModal`)
+- Backend เก็บลง column `posts.media_type` (text) พร้อม `NOT NULL DEFAULT 'image'`
+- ควบคุม media job ที่ enqueue: enqueue `AiJob.type='image'` หรือ `'short_video'` ตามค่านี้ (เลือกอย่างใดอย่างหนึ่ง, ไม่ใช่ทั้งคู่)
+- ใช้ใน frontend เพื่อแสดง in-flight placeholder ที่ถูกต้อง ("กำลังสร้างรูปภาพ…" vs "กำลังสร้างวิดีโอ…")
+
+### 2.2 เพิ่มเติม: structured failure context (มิ.ย. 2026)
+
+`posts.errorCode` (text) และ `ai_jobs.errorCode` (text) + `ai_jobs.metadata` (jsonb) เก็บ structured failure data:
+
+- **errorCode**: machine-readable code เช่น `content_safety`, `upload_failed`, `E_NO_FB_PAGE`, `E_FB`
+- **metadata**: เก็บ structured data เช่น `{"raiMediaFilteredReasons": ["Recitation check failed."]}`
+
+ตัวอย่าง: ถ้า Veo 3.1 block content ด้วย recitation check, n8n จะ POST error callback พร้อม `error.code = "content_safety"` และ `metadata.raiMediaFilteredReasons = ["Recitation check failed."]` → backend เก็บทั้งคู่ลง `ai_jobs` (structured) และ `last_error` (human-readable) — แล้ว post → `failed` พร้อม `errorMessage = "AI short_video job failed: content_safety: Content was filtered by Vertex AI safety check: Recitation check failed."`
 
 ---
 
@@ -66,8 +86,9 @@
 | From | Event | To | ใคร trigger |
 |---|---|---|---|
 | `draft` | enqueue AI jobs | `generating` | Backend (manual create) |
-| `generating` | media + caption สำเร็จ | `pending_approval` | Backend (callback) |
+| `generating` | caption + media callback success | `pending_approval` | Backend (callback) |
 | `generating` | 1 ในของ AI fail 3 ครั้ง | `failed` | Backend (retry) |
+| `failed` | retry สำเร็จในภายหลัง (clear error fields) | `pending_approval` | Backend (`checkPostGenerationComplete` — **revive**) |
 | `pending_approval` | user approve | `approved` | User |
 | `pending_approval` | user reject | `rejected` | User |
 | `pending_approval` | scheduled_at < now (cron) | `expired` | Backend (expire cron) |
@@ -78,6 +99,7 @@
 
 - ❌ `posted` → อะไรก็ตาม (terminal)
 - ❌ `rejected` → อะไรก็ตาม (terminal ใน MVP — ไม่มี undo)
+- ❌ `expired` → อะไรก็ตาม (terminal)
 - ❌ `expired` → อะไรก็ตาม (terminal)
 - ❌ `failed` → อะไรก็ตาม (terminal — user ต้องสร้าง post ใหม่)
 - ❌ `approved` → `pending_approval` (ห้าม undo)

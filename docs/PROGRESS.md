@@ -1,14 +1,80 @@
 # Project Progress — ERP-AI (MarketMate)
 
-> Last updated: 2026-06-28
-> Current Phase: **P2 Complete** (Email templates + Queue Processors)
-> Next Phase: **P3** (Polish — rate limiting, Bull Board, Swagger)
+> Last updated: 2026-06-29
+> Current Phase: **P4 Complete** (Polish, n8n integration, observability, structured errors)
+> Next Phase: **P5** (per-business AI quota, video transcription, retry-on-RAI-suppress)
 >
-> **AI services (decision, caption, media) are not yet built.** Backend has all
-> the integration points (internal callbacks, BullMQ workers) but the
-> outbound HTTP calls to `AI_DECISION_URL` / `AI_CAPTION_URL` / `AI_MEDIA_URL`
-> will fail with `ECONNREFUSED` until the AI side exists. Manual and
-> fixed-schedule posts work fully; auto_ai posts get stuck in `generating`.
+> **ทุก AI service ทำงานจริงแล้ว**: Decision + Caption (FastAPI + Groq) ใน `ai-services/`, Media (n8n + Vertex AI) ใน `n8n/n8n.json` End-to-end flow ทำงานครบ: สมัคร → onboard → สร้างโพสต์ (เลือก image หรือ short_video) → อนุมัติ → cron โพสต์ไป Facebook
+
+---
+
+## 🔧 Recent fixes (มิถุนายน 2026)
+
+### n8n workflow bug — "Cannot read properties of undefined (reading 'data')"
+
+- **Root cause:** `PUT Image/Video to MinIO` nodes ใน `n8n/n8n.json` ใช้ HTTP Request v4.2 แต่ใช้ parameter names ของ v1 (`specifyBody: "binary"`, `binaryPropertyName: "data"`) ซึ่ง v4.2 ไม่อ่าน ผลคือ body ไม่ถูกส่ง, `n8n` พยายามอ่าน `binary.data` → `undefined.data` → crash
+- **Fix:** เปลี่ยนเป็น `contentType: "binaryData"`, `inputDataFieldName: "data"`, `responseFormat: "text"`, `fullResponse: true`
+- **Verification:** end-to-end test โพสต์ `9c639bbd-…` (image) upload ไป MinIO สำเร็จ
+
+### RAI filter detection (Veo 3.1 recitation check)
+
+- **Symptom:** error "Could not find video URI: {…raiMediaFilteredCount:0, raiMediaFilteredReasons:['Recitation check failed.']…}"
+- **Fix:** เพิ่ม check `raiMediaFilteredCount > 0 || raiMediaFilteredReasons.length > 0` ใน `Evaluate Video Status` node ก่อน fallthrough ถึง gcsUri lookup — ผลิตข้อความ "Content was filtered by Vertex AI safety check: <reasons>"
+- **Output:** `ai_jobs.last_error = "content_safety: Content was filtered by Vertex AI safety check: Recitation check failed."` (human-readable)
+
+### `posts.mediaType` selector (ผู้ใช้เลือก image / short_video)
+
+- **New column:** `posts.media_type text NOT NULL DEFAULT 'image'` (migration `1719700000000-AddPostMediaType`)
+- **DTO:** `POST /posts` รับ `mediaType?: 'image' | 'short_video'`
+- **Service:** `enqueueFullAIPipeline()` enqueue เฉพาะ media kind ที่ผู้ใช้เลือก (ไม่ generate ทั้งคู่)
+- **Frontend:** `CreatePostModal` มี radio toggle "รูปภาพ" / "วิดีโอสั้น" + dynamic toast
+- **Verification:** end-to-end test โพสต์ video `ea078452-…` (3.2 MB MP4) สำเร็จ
+
+### API: `GET /posts` ไม่ส่ง media rows
+
+- **Symptom:** โพสต์มี `media` ใน DB แต่ `GET /posts` คืน `media: []` → frontend แสดง placeholder
+- **Fix:** `posts.service.ts:list()` เพิ่ม `.leftJoinAndSelect('post.media', 'media').leftJoinAndSelect('media.file', 'file')`; `getOne()` เปลี่ยน relations เป็น `{ media: { file: true }, aiJobs: true }`
+- **Verification:** `curl GET /posts?businessId=…` คืน media + publicUrl ครบ
+
+### GCS bucket public access ถูกปิด (recurring root cause)
+
+- **Symptom:** Veo 3.1 generate video สำเร็จ แต่ n8n โหลดวิดีโอจาก `storage.googleapis.com` ไม่ได้ → "Unable to fetch video file from URL"
+- **Root cause:** `publicAccessPrevention=enforced` บน bucket `water-fish-veo-bucket` → reject ทุก `allUsers` IAM bindings
+- **Fix:** `scripts/make_bucket_public.py` อัปเดตให้ 1) ตั้ง `publicAccessPrevention=inherited` (PUT ใหม่) แล้ว 2) เพิ่ม `allUsers=objectViewer` binding
+
+### `posts.failed` ไม่ถูก revive เมื่อ retry สำเร็จ
+
+- **Symptom:** post ถูก mark `failed` แล้ว, retry media สำเร็จ (มี post_media ใน DB) แต่ post ยังอยู่ใน `failed`
+- **Root cause:** `checkPostGenerationComplete()` early-return ถ้า `post.status !== 'generating'`
+- **Fix:** guard เปลี่ยนเป็น `!== 'generating' && !== 'failed'`; เพิ่ม revive path ที่ clear `errorCode`/`errorMessage`/`rejectionReason` ก่อน transition เป็น `pending_approval`
+- **Test:** end-to-end โพสต์ video 3.2 MB MP4 → `pending_approval` สำเร็จ (3.5 นาที)
+
+### Facebook dispatch ส่ง URL ที่ Facebook เข้าไม่ถึง
+
+- **Symptom:** scheduled posts ถูก dispatch แต่ Facebook คืน error 324 "Missing or invalid image file"
+- **Root cause:** `dispatch-post.processor.ts` ส่ง `{ url: 'http://localhost:9000/...' }` ให้ Facebook แต่ Facebook's servers เข้า `localhost` ไม่ได้
+- **Fix:** เปลี่ยนเป็น multipart upload — `S3Service.downloadFile()` อ่านไฟล์จาก MinIO แล้ว POST bytes ตรงไปที่ `graph.facebook.com/{ver}/{page-id}/{photos|videos}` (เหมือน `testPostToPage` ที่ใช้ได้อยู่แล้ว)
+- **Verification:** โพสต์ `b5910004-…` (text-only) → `posted` ✅; โพสต์ `11111111-…` (synthetic video) → `posted` ✅ `via /videos`
+
+### `ai_jobs.metadata` (jsonb) — structured failure context
+
+- **New columns:** `ai_jobs.metadata jsonb NOT NULL DEFAULT '{}'`, `ai_jobs.error_code text NULL`
+- **Migration:** `1719700000001-AddAiJobMetadata`
+- **Wire format:** n8n error chain ส่ง `payload.metadata.raiMediaFilteredReasons = [...]` → backend เก็บใน `metadata` แทนที่จะ parse จาก `lastError` string
+- **Index:** `idx_ai_jobs_error_code WHERE error_code IS NOT NULL` สำหรับ filter admin UI
+
+### gcp-key.json leak — git history purge
+
+- **Symptom:** `gcp-key.json` (real GCP service account JSON) ถูก commit ใน commit `fe76f9be feat: connect all module` และ push ไป `origin` (public repo)
+- **Fix:** 1) backup ไฟล์ไป `~/.config/erp-ai/`, 2) เพิ่ม `gcp-key.json` ใน `.gitignore` + สร้าง `gcp-key.json.example` template, 3) `git-filter-repo --invert-paths --path gcp-key.json` rewrite history, 4) reflog expire + gc, 5) **ต้อง user force-push ไป origin** (ผม push ไม่ได้เพราะไม่มี GitHub credentials), 6) **rotate key ใน GCP Console** (mandatory เพราะ secret ถูก expose)
+- **Pre-push verification:** `git log --all --oneline -- gcp-key.json` คืนว่าง (ไม่มี commit ที่มีไฟล์นี้)
+
+### Demo account seeded
+
+- Email: `demo@erp-ai.test` / Password: `Test1234!` (สำหรับ dev/test login โดยไม่ต้อง register)
+- Business: ร้านกาแฟโบราณ + มี connected Facebook Page (Test1122) ใน DB
+
+---
 
 ---
 
