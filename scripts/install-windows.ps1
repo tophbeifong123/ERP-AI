@@ -81,7 +81,11 @@ Write-Host "3. Installing frontend dependencies..." -ForegroundColor Yellow
 $frontendDir = Join-Path $root "frontend"
 Set-Location $frontendDir
 if (-not (Test-Path "node_modules")) {
-    & pnpm install
+    # pnpm 11 aborts if any dep has an unapproved build script (sharp, unrs-resolver).
+    # .npmrc at frontend/ lists them, but on a fresh install pnpm still
+    # refuses. --ignore-scripts skips the build step on initial install; we
+    # rebuild the two native-binding packages explicitly below.
+    & pnpm install --ignore-scripts
     if ($LASTEXITCODE -ne 0) { Write-Host "  [FAIL] pnpm install failed in $frontendDir" -ForegroundColor Red; exit 1 }
 } else {
     Write-Host "  [SKIP] node_modules already exists" -ForegroundColor DarkGray
@@ -92,7 +96,13 @@ if (-not (Test-Path "node_modules")) {
 # Idempotent - safe to run every time, no-op if already approved.
 $env:CI = 'true'
 & pnpm approve-builds 2>&1 | Out-Null
-if ($LASTEXITCODE -ne 0) { Write-Host "  [WARN] pnpm approve-builds failed (non-fatal - dev may prompt)" -ForegroundColor Yellow }
+
+# Run native-binding builds for sharp + unrs-resolver. These are needed by
+# Next.js (image optimization) and Turbopack. pnpm 11 ignores their build
+# scripts by default (for safety), so we have to run them explicitly. The
+# `.npmrc` declares them as allowed; this rebuild is a belt-and-suspenders.
+& pnpm rebuild sharp unrs-resolver 2>&1 | Out-Null
+if ($LASTEXITCODE -ne 0) { Write-Host "  [WARN] pnpm rebuild sharp unrs-resolver failed (Next.js may still work)" -ForegroundColor Yellow }
 
 # 4. Create frontend/.env if missing -------------------------------------------
 
